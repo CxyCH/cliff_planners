@@ -1,0 +1,5 @@
+<library path="lib/libcliff_planners">
+  <class name="cliff_planners/DownTheCLiFFPlanner" type="cliff_planners::DownTheCLiFFPlanner" base_class_type="nav_core::BaseGlobalPlanner">
+    <description>Global Planner plugin using SMP motion planning library. It uses CLiFFMap info in a RRTStar and Dubin's car vehicle dynamics.</description>
+  </class>
+</library>
