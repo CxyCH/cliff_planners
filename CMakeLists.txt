@@ -10,15 +10,16 @@ find_package(catkin REQUIRED COMPONENTS
   smp_ros
   std_msgs
   tf
+  visualization_msgs
   nav_core
-  )
+)
 
 find_package(MRPT REQUIRED)
 
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES cliff_planners
-  CATKIN_DEPENDS cliffmap_ros geometry_msgs roscpp smp_ros std_msgs tf nav_core
+  CATKIN_DEPENDS cliffmap_ros geometry_msgs roscpp smp_ros std_msgs tf nav_core visualization_msgs
 )
 
 include_directories(
@@ -38,6 +39,16 @@ target_link_libraries(cliff_planners
   ${MRPT_LIBRARIES}
 )
 
+add_executable(standalone_planner
+  src/standalone_planner.cpp
+)
+
+add_dependencies(standalone_planner ${standalone_planner_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+target_link_libraries(standalone_planner
+  cliff_planners
+  ${catkin_LIBRARIES}
+)
 #############
 ## Install ##
 #############

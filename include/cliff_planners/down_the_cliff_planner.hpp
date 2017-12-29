@@ -29,6 +29,7 @@
 #include <nav_msgs/GetMap.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <ros/ros.h>
+#include <visualization_msgs/MarkerArray.h>
 
 // SMP TYPE DEFINITIONS -------
 // State, input, vertex_data, and edge_data definitions
@@ -71,12 +72,14 @@ private:
   cliffmap_ros::CLiFFMap cliffmap;
 
   ros::Publisher graph_pub;
+  ros::Publisher marker_pub;
 
   std::shared_ptr<mrpt::maps::COccupancyGridMap2D> map;
   std::shared_ptr<mrpt::math::CPolygon> footprint;
 
-  //Debugging
+  // Debugging
   geometry_msgs::PoseArray graph;
+  visualization_msgs::MarkerArray ma;
 
 protected:
   virtual void initialize(std::string name,
@@ -84,6 +87,14 @@ protected:
   virtual bool makePlan(const geometry_msgs::PoseStamped &start,
                         const geometry_msgs::PoseStamped &goal,
                         std::vector<geometry_msgs::PoseStamped> &plan);
+
+  /**
+   * This function computes the Down-the-cliff cost.
+   * This includes the cost of distance and the Mahalanobis cost.
+   */
+  double cost_function_cliff(typeparams::state *state_initial_in,
+                             trajectory_t *trajectory_in,
+                             typeparams::state *state_final_in);
 
 public:
   inline DownTheCLiFFPlanner() {}
@@ -98,7 +109,9 @@ public:
 std::array<double, 3> distanceBetweenStates(const std::array<double, 3> &state,
                                             const std::array<double, 3> &goal);
 
-template <typename T> void graphToMsg(ros::NodeHandle& nh, geometry_msgs::PoseArray& graph, smp::vertex<T> *root) {
+template <typename T>
+void graphToMsg(ros::NodeHandle &nh, geometry_msgs::PoseArray &graph,
+                smp::vertex<T> *root) {
   geometry_msgs::Pose p;
   p.position.x = root->state->state_vars[0];
   p.position.y = root->state->state_vars[1];
