@@ -39,6 +39,11 @@ void mrptMapFromROSMsg(
 
 namespace cliff_planners {
 
+void DownTheCLiFFPlanner::init(std::string name,
+                               costmap_2d::Costmap2DROS *costmap_ros) {
+  initialize(name, costmap_ros);
+}
+
 void DownTheCLiFFPlanner::initialize(std::string name,
                                      costmap_2d::Costmap2DROS *costmap_ros) {
 
@@ -47,24 +52,29 @@ void DownTheCLiFFPlanner::initialize(std::string name,
   private_nh.param<std::string>("cliffmap_file_name", cliffmapFileName, "");
 
   if (cliffmapFileName.empty()) {
-    ROS_ERROR("No cliffmap file name provided. Use simple RRT if cliffmap is "
-              "unavailable.");
+    ROS_ERROR("No cliffmap file name parameter in namespace %s. Use simple RRT "
+              "if cliffmap is unavailable.",
+              private_nh.getNamespace().c_str());
     exit(1);
   }
 
-  cliffmap.readFromXML(cliffmapFileName);
-  cliffmap.organizeAsGrid();
+  cliffmap = std::make_shared<cliffmap_ros::CLiFFMap>();
+  cliffmap->readFromXML(cliffmapFileName);
+  cliffmap->organizeAsGrid();
 
   ROS_INFO("Read a cliffmap XML organized as a grid @ %lf m/cell resolution.",
-           cliffmap.getResolution());
+           cliffmap->getResolution());
 
   marker_pub =
       nh.advertise<visualization_msgs::MarkerArray>("visualization_markers", 1);
-  ma = cliffmap.toVisualizationMarkers();
+  ma = cliffmap->toVisualizationMarkers();
   marker_pub.publish(ma);
 
   // TODO: All parameters must be configurable.
   graph_pub = nh.advertise<geometry_msgs::PoseArray>("/graph", 100);
+
+  // Path publisher
+  path_pub = nh.advertise<nav_msgs::Path>("/path", 10);
 
   map = std::make_shared<mrpt::maps::COccupancyGridMap2D>();
   mrptMapFromROSMsg(map, costmap_ros->getCostmap());
@@ -78,7 +88,7 @@ void DownTheCLiFFPlanner::initialize(std::string name,
   }
 
   if (footprint_pt.size() != 4) {
-    ROS_WARN("Footprint wasn't a polygon. Setting to default values.");
+    ROS_WARN("Footprint wasn't a polygon. Setting to default values. Size was: %ld", footprint_pt.size());
     footprint->AddVertex(0.25, 0.125);
     footprint->AddVertex(0.25, -0.125);
     footprint->AddVertex(-0.25, 0.125);
@@ -87,20 +97,10 @@ void DownTheCLiFFPlanner::initialize(std::string name,
     ROS_INFO("DownTheCLiFFPlanner got a polygon footprint.");
   }
 
-  // TODO: Inflation radius and footprint must be configurable.
-  // sampler can't be std::shared_ptr
   collision_checker = std::shared_ptr<CollisionCheckerMCMRPT>(
       new CollisionCheckerMCMRPT(map, 0.15, footprint));
 
-  // Sampler support should also be configurable.
-  smp::region<3> sampler_support;
-  sampler_support.center[0] = 0.0;
-  sampler_support.size[0] = 10.0;
-  sampler_support.center[1] = 0.0;
-  sampler_support.size[1] = 10.0;
-  sampler_support.center[2] = 0.0;
-  sampler_support.size[2] = 3.14;
-  sampler.set_support(sampler_support);
+  sampler.set_support(cliffmap);
 }
 
 bool DownTheCLiFFPlanner::makePlan(
@@ -126,6 +126,7 @@ bool DownTheCLiFFPlanner::makePlan(
   planner.parameters.set_gamma(std::max(map->getXMax(), map->getYMax()));
   planner.parameters.set_dimension(3);
   planner.parameters.set_max_radius(10.0);
+  sampler.reset_rejections();
 
   ROS_INFO("Start: (%lf,%lf,%lf degrees)", start.pose.position.x,
            start.pose.position.y,
@@ -137,8 +138,6 @@ bool DownTheCLiFFPlanner::makePlan(
            2 * atan2(goal.pose.orientation.z, goal.pose.orientation.w) * 180 /
                M_PI);
 
-  ros::Publisher path_pub = nh.advertise<geometry_msgs::PoseArray>("/path", 10);
-
   smp::region<3> region_goal;
   region_goal.center[0] = goal.pose.position.x;
   region_goal.size[0] = 0.75;
@@ -148,7 +147,7 @@ bool DownTheCLiFFPlanner::makePlan(
 
   region_goal.center[2] =
       2 * atan2(goal.pose.orientation.z, goal.pose.orientation.w);
-  region_goal.size[2] = 0.2;
+  region_goal.size[2] = 0.25;
 
   min_time_reachability.set_goal_region(region_goal);
   min_time_reachability.set_distance_function(distanceBetweenStates);
@@ -171,7 +170,11 @@ bool DownTheCLiFFPlanner::makePlan(
   ros::Time t = ros::Time::now();
   // 3. RUN THE PLANNER
   int i = 0;
-  double planning_time = 5.0;
+  double planning_time = 15.0;
+
+  nh.param("planning_time", planning_time, 60.0);
+  ROS_INFO("Planning time limit is %lf sec.", planning_time);
+  double last_best_cost = -1.0;
 
   graph.header.frame_id = "map";
   while (ros::ok()) {
@@ -184,27 +187,37 @@ bool DownTheCLiFFPlanner::makePlan(
     planner.iteration();
 
     graph.poses.clear();
-
     graphToMsg(nh, graph, planner.get_root_vertex());
     graph.header.stamp = ros::Time::now();
-
     graph_pub.publish(graph);
-    ROS_INFO_THROTTLE(1.0, "Planner iteration : %d", i);
+
+    if (min_time_reachability.get_best_cost() > 0.0) {
+      if (min_time_reachability.get_best_cost() != last_best_cost) {
+        last_best_cost = min_time_reachability.get_best_cost();
+        trajectory_t trajectory_final;
+        min_time_reachability.get_solution(trajectory_final);
+        publishPath(trajectory_final, plan);
+      }
+    }
+
+    ROS_INFO_THROTTLE(1.0, "Planner iteration : %d. Rejections: %u", i,
+                      sampler.get_total_rejections());
   }
 
-  trajectory_t trajectory_final;
-  min_time_reachability.get_solution(trajectory_final);
+  if (plan.empty()) {
+    ROS_ERROR("NO PLAN FOUND!");
+  }
 
-  geometry_msgs::PoseArray path;
+  return true;
+}
+
+void DownTheCLiFFPlanner::publishPath(
+    const trajectory_t &trajectory_final,
+    std::vector<geometry_msgs::PoseStamped> &plan) {
+  plan.clear();
+  nav_msgs::Path path;
 
   for (const auto &state : trajectory_final.list_states) {
-    geometry_msgs::Pose p;
-    p.position.x = (*state)[0];
-    p.position.y = (*state)[1];
-    p.orientation.z = sin((*state)[2] / 2);
-    p.orientation.w = cos((*state)[2] / 2);
-    path.poses.push_back(p);
-
     geometry_msgs::PoseStamped pose;
     pose.pose.position.x = (*state)[0];
     pose.pose.position.y = (*state)[1];
@@ -224,11 +237,8 @@ bool DownTheCLiFFPlanner::makePlan(
 
   path.header.stamp = ros::Time::now();
   path.header.frame_id = "map";
+  path.poses = plan;
   path_pub.publish(path);
-
-  sleep(2);
-
-  return true;
 }
 
 double
@@ -239,45 +249,45 @@ DownTheCLiFFPlanner::cost_function_cliff(typeparams::state *state_initial_in,
   typedef typeparams::state state_t;
   typedef typeparams::input input_t;
 
-  double total_time = 0.0;
-  double total_distance = 0.0;
   state_t *state_prev = state_initial_in;
-  double cliffcost = 0.0;
   double total_cost = 0.0;
 
   std::list<state_t *>::iterator iter_state =
       trajectory_in->list_states.begin();
-  for (std::list<input_t *>::iterator iter = trajectory_in->list_inputs.begin();
-       iter != trajectory_in->list_inputs.end(); iter++) {
-    input_t *input_curr = *iter;
+
+  for (std::list<input_t *>::iterator iter_input =
+           trajectory_in->list_inputs.begin();
+       iter_input != trajectory_in->list_inputs.end(); iter_input++) {
+    input_t *input_curr = *iter_input;
     state_t *state_curr = *iter_state;
 
-    std::array<double, 3> s_curr, s_prev;
-    for (int i = 0; i < 3; i++) {
-      s_curr[i] = state_curr->state_vars[i];
-      s_prev[i] = state_prev->state_vars[i];
-    }
-
-    std::array<double, 3> p = distanceBetweenStates(s_curr, s_prev);
-    double this_distance = 0.0;
-    for (int i = 0; i < 3; i++) {
-      this_distance += p[i] * p[i];
-    }
-    double this_time = (*input_curr)[0];
+    // 1. Compute distance between the previous and current state.
+    double this_distance =
+        pow(state_curr->state_vars[0] - state_prev->state_vars[0], 2) +
+        pow(state_curr->state_vars[1] - state_prev->state_vars[1], 2);
     this_distance = sqrt(this_distance);
 
-    if (this_time == 0.0 || this_distance == 0.0)
-      continue;
+    // 2. Compute the quaternion distance.
+    double dot = cos(state_curr->state_vars[2] / 2.0) *
+                     cos(state_prev->state_vars[2] / 2.0) +
+                 sin(state_curr->state_vars[2] / 2.0 *
+                     sin(state_prev->state_vars[2] / 2.0));
 
+    double q_dist = pow(1.0 - fabs(dot), 2);
+
+    // Total distance for now.
+    total_cost += 1.5 * sqrt(pow(this_distance, 2) + q_dist);
+
+    double this_time = (*input_curr)[0];
+
+    double cliffcost = 0.0;
     Eigen::Vector2d V;
-    V[0] = s_curr[2];
+    V[0] = state_curr->state_vars[2];
     V[1] = this_distance / this_time;
-
-    double x = s_curr[0];
-    double y = s_curr[1];
-
-    double trust = cliffmap(x, y).p * cliffmap(x, y).q;
-    for (const auto &dist : cliffmap(x, y).distributions) {
+    double x = state_curr->state_vars[0];
+    double y = state_curr->state_vars[1];
+    double trust = (*cliffmap)(x, y).p * (*cliffmap)(x, y).q;
+    for (const auto &dist : (*cliffmap)(x, y).distributions) {
       Eigen::Matrix2d Sigma;
       std::array<double, 4> sigma_array = dist.getCovariance();
       Sigma(0, 0) = sigma_array[0];
@@ -289,28 +299,16 @@ DownTheCLiFFPlanner::cost_function_cliff(typeparams::state *state_initial_in,
       myu[1] = dist.getMeanSpeed();
 
       double inc_cost = 0.0;
-      if (Sigma.determinant() < 1e-5 && Sigma.determinant() > -1e-5)
-        inc_cost += 10000;
+      if (Sigma.determinant() < 1e-4 && Sigma.determinant() > -1e-4)
+        inc_cost += 100.00;
       else
         inc_cost =
             sqrt((V - myu).transpose() * Sigma.inverse() * (V - myu)) * trust;
 
+      if (inc_cost > 100.00)
+        inc_cost = 100.00f;
+
       cliffcost += inc_cost;
-
-      Eigen::Vector4f q_curr, q_prev;
-      q_curr(0) = cos(s_curr[2] / 2);
-      q_curr(1) = 0.0;
-      q_curr(2) = 0.0;
-      q_curr(3) = sin(s_curr[2] / 2);
-
-      q_prev(0) = cos(s_prev[2] / 2);
-      q_prev(1) = 0.0;
-      q_prev(2) = 0.0;
-      q_prev(3) = sin(s_prev[2] / 2);
-
-      double q_dist = fabs(1.0 - (q_curr.transpose() * q_prev));
-
-      total_cost += 0.8*(q_dist + total_distance) + 0.2*cliffcost;
 
       if (isnan(cliffcost)) {
         std::cout << "Sigma: " << Sigma << std::endl;
@@ -323,14 +321,12 @@ DownTheCLiFFPlanner::cost_function_cliff(typeparams::state *state_initial_in,
         std::cout << "SHIT!" << std::endl;
       }
     }
-
-    // total_distance += this_distance;
-    // total_time += this_time;
+    // 3. Add the cliffcost
+    total_cost += cliffcost / 100.0;
 
     state_prev = *iter_state;
     iter_state++;
   }
-
   // return total_time;
   return total_cost;
 }

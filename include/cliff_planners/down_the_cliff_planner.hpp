@@ -5,13 +5,15 @@
 // CLiFFMapROS headers
 #include <cliffmap_ros/cliffmap.hpp>
 
+// This package headers
+#include <smp/components/samplers/cliff.hpp>
+
 // SMP HEADER FILES ------
 #include <smp/components/collision_checkers/multiple_circles_mrpt.hpp>
 #include <smp/components/distance_evaluators/kdtree.hpp>
 #include <smp/components/extenders/dubins.hpp>
 #include <smp/components/extenders/single_integrator.hpp>
 #include <smp/components/multipurpose/minimum_time_reachability.hpp>
-#include <smp/components/samplers/uniform.hpp>
 #include <smp/planners/rrtstar.hpp>
 
 #include <smp/planner_utils/trajectory.hpp>
@@ -28,6 +30,7 @@
 #include <nav_core/base_global_planner.h>
 #include <nav_msgs/GetMap.h>
 #include <nav_msgs/OccupancyGrid.h>
+#include <nav_msgs/Path.h>
 #include <ros/ros.h>
 #include <visualization_msgs/MarkerArray.h>
 
@@ -50,7 +53,7 @@ typedef struct _typeparams {
 typedef smp::trajectory<typeparams> trajectory_t;
 
 // Define all planner component types
-typedef smp::sampler_uniform<typeparams, 3> UniformSampler;
+typedef smp::sampler_cliff<typeparams, 3> CLiFFMapSampler;
 typedef smp::distance_evaluator_kdtree<typeparams, 3> KDTreeDistanceEvaluator;
 typedef smp::extender_dubins<typeparams> ExtenderDubins;
 typedef smp::collision_checker_mc_mrpt<typeparams> CollisionCheckerMCMRPT;
@@ -65,14 +68,15 @@ class DownTheCLiFFPlanner : public nav_core::BaseGlobalPlanner {
 
 private:
   ros::NodeHandle nh;
-  UniformSampler sampler;
+  CLiFFMapSampler sampler;
   ExtenderDubins extender;
   std::shared_ptr<CollisionCheckerMCMRPT> collision_checker;
 
-  cliffmap_ros::CLiFFMap cliffmap;
+  cliffmap_ros::CLiFFMapPtr cliffmap;
 
   ros::Publisher graph_pub;
   ros::Publisher marker_pub;
+  ros::Publisher path_pub;
 
   std::shared_ptr<mrpt::maps::COccupancyGridMap2D> map;
   std::shared_ptr<mrpt::math::CPolygon> footprint;
@@ -96,7 +100,16 @@ protected:
                              trajectory_t *trajectory_in,
                              typeparams::state *state_final_in);
 
+  void publishPath(const trajectory_t &trajectory_final,
+                   std::vector<geometry_msgs::PoseStamped> &plan);
+
 public:
+  inline bool makePlan_1(const geometry_msgs::PoseStamped &start,
+                         const geometry_msgs::PoseStamped &goal,
+                         std::vector<geometry_msgs::PoseStamped> &plan) {
+    makePlan(start, goal, plan);
+  }
+  void init(std::string name, costmap_2d::Costmap2DROS *costmap_ros);
   inline DownTheCLiFFPlanner() {}
   inline virtual ~DownTheCLiFFPlanner() {}
 };
