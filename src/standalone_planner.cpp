@@ -76,9 +76,9 @@ StandAlonePlanner::StandAlonePlanner()
   costmap.start();
   make_plan_client = nh.serviceClient<nav_msgs::GetPlan>("make_plan");
   make_plan_client.waitForExistence();
-  ROS_INFO("Connect to move base. Make plans by setting two navigation goals "
-           "in rviz. The first one will be interpretted as the start pose. "
-           "The second will be interpretted as the goal.");
+  ROS_INFO("Connect to move base. Make plans by setting two navigation goals\n"
+           "in rviz. The first one will be interpretted as the start pose.\n"
+           "The second will be interpretted as the goal.\n");
 
   pose_sub = nh.subscribe("pose", 1, &StandAlonePlanner::poseCallback, this);
 
@@ -106,6 +106,7 @@ void spin() { ros::spin(); }
 
 int main(int argn, char *args[]) {
 
+  setlocale(LC_NUMERIC, "");
   ros::init(argn, args, "stand_alone_planner");
   StandAlonePlanner sap;
 
@@ -126,8 +127,7 @@ int main(int argn, char *args[]) {
         sap.reset();
       }
     } else {
-      sleep(1);
-      ROS_INFO("Waiting for start, end.");
+      usleep(100000);
     }
   }
 

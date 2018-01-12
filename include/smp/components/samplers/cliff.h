@@ -51,6 +51,8 @@ public:
   int sm_update_delete_edge(edge_t *edge_in);
 
   int sample(state_t **state_sample_out);
+  
+  int sampleV2(state_t **state_sample_out);
 
   unsigned int get_total_rejections();
 

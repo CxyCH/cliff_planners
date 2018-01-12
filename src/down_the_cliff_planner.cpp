@@ -88,7 +88,9 @@ void DownTheCLiFFPlanner::initialize(std::string name,
   }
 
   if (footprint_pt.size() != 4) {
-    ROS_WARN("Footprint wasn't a polygon. Setting to default values. Size was: %ld", footprint_pt.size());
+    ROS_WARN(
+        "Footprint wasn't a polygon. Setting to default values. Size was: %ld",
+        footprint_pt.size());
     footprint->AddVertex(0.25, 0.125);
     footprint->AddVertex(0.25, -0.125);
     footprint->AddVertex(-0.25, 0.125);
@@ -140,10 +142,10 @@ bool DownTheCLiFFPlanner::makePlan(
 
   smp::region<3> region_goal;
   region_goal.center[0] = goal.pose.position.x;
-  region_goal.size[0] = 0.75;
+  region_goal.size[0] = 0.5;
 
   region_goal.center[1] = goal.pose.position.y;
-  region_goal.size[1] = 0.75;
+  region_goal.size[1] = 0.5;
 
   region_goal.center[2] =
       2 * atan2(goal.pose.orientation.z, goal.pose.orientation.w);
@@ -177,7 +179,14 @@ bool DownTheCLiFFPlanner::makePlan(
   double last_best_cost = -1.0;
 
   graph.header.frame_id = "map";
+  bool no_soln = true;
+
+  std::chrono::steady_clock clock;
+  std::chrono::duration<long int, std::ratio<1l, 1000000000l>> total_time =
+      clock.now() - clock.now();
+
   while (ros::ok()) {
+    auto start_time = clock.now();
     ++i;
     if (ros::Time::now() - t > ros::Duration(planning_time)) {
       ROS_INFO("Planning time of %lf sec. elapsed.", planning_time);
@@ -192,18 +201,26 @@ bool DownTheCLiFFPlanner::makePlan(
     graph_pub.publish(graph);
 
     if (min_time_reachability.get_best_cost() > 0.0) {
-      if (min_time_reachability.get_best_cost() != last_best_cost) {
+      if (min_time_reachability.get_best_cost() < last_best_cost || no_soln) {
+        ROS_INFO("New solution found after %lf seconds.",
+                 planner.get_planning_time());
         last_best_cost = min_time_reachability.get_best_cost();
         trajectory_t trajectory_final;
         min_time_reachability.get_solution(trajectory_final);
+        double cost = cost_function_cliff(state_initial, &trajectory_final,
+                                          trajectory_final.list_states.back());
         publishPath(trajectory_final, plan);
+        no_soln = false;
       }
     }
 
-    ROS_INFO_THROTTLE(1.0, "Planner iteration : %d. Rejections: %u", i,
-                      sampler.get_total_rejections());
+    // ROS_INFO_THROTTLE(1.0, "Planner iteration : %d. Rejections: %u", i,
+    //                  sampler.get_total_rejections());
+    auto end_time = clock.now();
+    total_time += end_time - start_time;
   }
 
+  ROS_INFO("Total time: %lf seconds", total_time.count() / 1e9);
   if (plan.empty()) {
     ROS_ERROR("NO PLAN FOUND!");
   }
@@ -276,7 +293,7 @@ DownTheCLiFFPlanner::cost_function_cliff(typeparams::state *state_initial_in,
     double q_dist = pow(1.0 - fabs(dot), 2);
 
     // Total distance for now.
-    total_cost += 1.5 * sqrt(pow(this_distance, 2) + q_dist);
+    total_cost += sqrt(pow(this_distance, 2) + q_dist);
 
     double this_time = (*input_curr)[0];
 
@@ -300,13 +317,13 @@ DownTheCLiFFPlanner::cost_function_cliff(typeparams::state *state_initial_in,
 
       double inc_cost = 0.0;
       if (Sigma.determinant() < 1e-4 && Sigma.determinant() > -1e-4)
-        inc_cost += 100.00;
+        inc_cost += 10000.00;
       else
         inc_cost =
             sqrt((V - myu).transpose() * Sigma.inverse() * (V - myu)) * trust;
 
-      if (inc_cost > 100.00)
-        inc_cost = 100.00f;
+      // if (inc_cost > 10000.00)
+      //  inc_cost = 10000.00f;
 
       cliffcost += inc_cost;
 
@@ -322,7 +339,7 @@ DownTheCLiFFPlanner::cost_function_cliff(typeparams::state *state_initial_in,
       }
     }
     // 3. Add the cliffcost
-    total_cost += cliffcost / 100.0;
+    total_cost += cliffcost / 1000.0;
 
     state_prev = *iter_state;
     iter_state++;
