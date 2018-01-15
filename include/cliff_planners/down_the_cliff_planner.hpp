@@ -33,6 +33,7 @@
 #include <nav_msgs/Path.h>
 #include <ros/ros.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <std_msgs/Float64MultiArray.h>
 
 // SMP TYPE DEFINITIONS -------
 // State, input, vertex_data, and edge_data definitions
@@ -77,6 +78,7 @@ private:
   ros::Publisher graph_pub;
   ros::Publisher marker_pub;
   ros::Publisher path_pub;
+  ros::Publisher performance_pub;
 
   std::shared_ptr<mrpt::maps::COccupancyGridMap2D> map;
   std::shared_ptr<mrpt::math::CPolygon> footprint;
@@ -98,7 +100,8 @@ protected:
    */
   double cost_function_cliff(typeparams::state *state_initial_in,
                              trajectory_t *trajectory_in,
-                             typeparams::state *state_final_in);
+                             typeparams::state *state_final_in,
+                             bool only_distance_cost = false);
 
   void publishPath(const trajectory_t &trajectory_final,
                    std::vector<geometry_msgs::PoseStamped> &plan);

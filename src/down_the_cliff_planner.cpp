@@ -76,6 +76,10 @@ void DownTheCLiFFPlanner::initialize(std::string name,
   // Path publisher
   path_pub = nh.advertise<nav_msgs::Path>("/path", 10);
 
+  // Performance measures
+  performance_pub =
+      nh.advertise<std_msgs::Float64MultiArray>("/performance_measures", 100);
+
   map = std::make_shared<mrpt::maps::COccupancyGridMap2D>();
   mrptMapFromROSMsg(map, costmap_ros->getCostmap());
 
@@ -119,7 +123,7 @@ bool DownTheCLiFFPlanner::makePlan(
 
   min_time_reachability.set_cost_function(std::bind(
       &DownTheCLiFFPlanner::cost_function_cliff, this, std::placeholders::_1,
-      std::placeholders::_2, std::placeholders::_3));
+      std::placeholders::_2, std::placeholders::_3, false));
 
   RRTStar planner(sampler, distance_evaluator, extender, *collision_checker,
                   min_time_reachability, min_time_reachability);
@@ -198,18 +202,30 @@ bool DownTheCLiFFPlanner::makePlan(
     graph.poses.clear();
     graphToMsg(nh, graph, planner.get_root_vertex());
     graph.header.stamp = ros::Time::now();
-    graph_pub.publish(graph);
+    //graph_pub.publish(graph);
 
     if (min_time_reachability.get_best_cost() > 0.0) {
       if (min_time_reachability.get_best_cost() < last_best_cost || no_soln) {
         ROS_INFO("New solution found after %lf seconds.",
                  planner.get_planning_time());
+        //ROS_INFO("%lf > %lf now", last_best_cost, min_time_reachability.get_best_cost());
         last_best_cost = min_time_reachability.get_best_cost();
         trajectory_t trajectory_final;
         min_time_reachability.get_solution(trajectory_final);
-        double cost = cost_function_cliff(state_initial, &trajectory_final,
-                                          trajectory_final.list_states.back());
         publishPath(trajectory_final, plan);
+
+        // Performance measures
+        std_msgs::Float64MultiArray performance_msg;
+        // Time to solution;
+        performance_msg.data.push_back(planner.get_planning_time());
+        // Cost of solution;
+        performance_msg.data.push_back(last_best_cost);
+        // Distance cost
+        performance_msg.data.push_back(cost_function_cliff(state_initial, &trajectory_final, trajectory_final.list_states.back(), true));
+
+        // Nodes in tree
+        performance_msg.data.push_back(graph.poses.size());
+        performance_pub.publish(performance_msg);
         no_soln = false;
       }
     }
@@ -261,13 +277,15 @@ void DownTheCLiFFPlanner::publishPath(
 double
 DownTheCLiFFPlanner::cost_function_cliff(typeparams::state *state_initial_in,
                                          trajectory_t *trajectory_in,
-                                         typeparams::state *state_final_in) {
+                                         typeparams::state *state_final_in,
+                                         bool only_distance_cost) {
 
   typedef typeparams::state state_t;
   typedef typeparams::input input_t;
 
   state_t *state_prev = state_initial_in;
   double total_cost = 0.0;
+  double distance_cost = 0.0;
 
   std::list<state_t *>::iterator iter_state =
       trajectory_in->list_states.begin();
@@ -292,6 +310,7 @@ DownTheCLiFFPlanner::cost_function_cliff(typeparams::state *state_initial_in,
 
     double q_dist = pow(1.0 - fabs(dot), 2);
 
+    distance_cost += sqrt(pow(this_distance, 2) + q_dist);
     // Total distance for now.
     total_cost += sqrt(pow(this_distance, 2) + q_dist);
 
@@ -345,7 +364,10 @@ DownTheCLiFFPlanner::cost_function_cliff(typeparams::state *state_initial_in,
     iter_state++;
   }
   // return total_time;
-  return total_cost;
+  if(only_distance_cost)
+    return distance_cost;
+  else 
+    return total_cost;
 }
 }
 
