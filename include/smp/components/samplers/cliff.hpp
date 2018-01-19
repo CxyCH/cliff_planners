@@ -63,6 +63,8 @@ int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sample(
 
   return sampleV2(state_sample_out);
 
+  /**
+     OLD METHOD. Not super good.
   if (NUM_DIMENSIONS <= 0)
     return 0;
 
@@ -93,6 +95,7 @@ int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sample(
   *state_sample_out = state_new;
 
   return 1;
+  */
 }
 
 template <class typeparams, int NUM_DIMENSIONS>
@@ -108,7 +111,17 @@ int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sampleV2(
   double randnum1 = double(rand()) / double(RAND_MAX);
   double randnum2 = double(rand()) / double(RAND_MAX);
 
-  for (int i = 0; ;i++) {
+  for (int i = 0;; i++) {
+
+    // With a small probability pick the goal itself.
+    if (bias > randnum1) {
+      for (int i = 0; i < NUM_DIMENSIONS; i++)
+        (*state_new)[i] = region_goal.size[i] * rand() / (RAND_MAX + 1.0) -
+                          region_goal.size[i] / 2.0 + region_goal.center[i];
+      *state_sample_out = state_new;
+      return 1;
+    }
+    // obvious else
     // Generate an independent random variable for each axis.
     for (int i = 0; i < NUM_DIMENSIONS; i++)
       (*state_new)[i] = support.size[i] * rand() / (RAND_MAX + 1.0) -
@@ -135,13 +148,14 @@ int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sampleV2(
       //
       else {
         // Accept sample but follow flow.
-        if((*cliffmap)(x,y).distributions.size() > 0)
-          state_new->state_vars[2] = (*cliffmap)(x,y).distributions[0].getMeanHeading();
+        if ((*cliffmap)(x, y).distributions.size() > 0)
+          state_new->state_vars[2] =
+              (*cliffmap)(x, y).distributions[0].getMeanHeading();
         else {
-          // No distribution here. Accept it without changes. 
+          // No distribution here. Accept it without changes.
         }
         rejections += i;
-        break; 
+        break;
       }
     }
   }
@@ -161,4 +175,15 @@ int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::set_support(
   support.size[1] = cliffmap->getYMax() - cliffmap->getYMin();
   support.center[2] = 0.0;
   support.size[2] = 2 * M_PI;
+
+  return 1;
+}
+
+template <class typeparams, int NUM_DIMENSIONS>
+int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::set_goal_bias(
+    double bias, const region_t &region_goal) {
+  this->bias = bias;
+  this->region_goal = region_goal;
+  time_t t;
+  srand((unsigned)time(&t));
 }

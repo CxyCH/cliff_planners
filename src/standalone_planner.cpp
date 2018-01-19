@@ -127,7 +127,7 @@ int main(int argn, char *args[]) {
         sap.reset();
       }
     } else {
-      usleep(100000);
+      usleep(10000);
     }
   }
 

@@ -146,17 +146,19 @@ bool DownTheCLiFFPlanner::makePlan(
 
   smp::region<3> region_goal;
   region_goal.center[0] = goal.pose.position.x;
-  region_goal.size[0] = 0.5;
+  region_goal.size[0] = 0.1;
 
   region_goal.center[1] = goal.pose.position.y;
-  region_goal.size[1] = 0.5;
+  region_goal.size[1] = 0.1;
 
   region_goal.center[2] =
       2 * atan2(goal.pose.orientation.z, goal.pose.orientation.w);
-  region_goal.size[2] = 0.25;
+  region_goal.size[2] = 0.1;
 
   min_time_reachability.set_goal_region(region_goal);
   min_time_reachability.set_distance_function(distanceBetweenStates);
+
+  sampler.set_goal_bias(0.05, region_goal);
 
   StateDubins *state_initial = new StateDubins;
 
@@ -176,7 +178,7 @@ bool DownTheCLiFFPlanner::makePlan(
   ros::Time t = ros::Time::now();
   // 3. RUN THE PLANNER
   int i = 0;
-  double planning_time = 15.0;
+  double planning_time = 5.0;
 
   nh.param("planning_time", planning_time, 60.0);
   ROS_INFO("Planning time limit is %lf sec.", planning_time);
@@ -202,13 +204,14 @@ bool DownTheCLiFFPlanner::makePlan(
     graph.poses.clear();
     graphToMsg(nh, graph, planner.get_root_vertex());
     graph.header.stamp = ros::Time::now();
-    //graph_pub.publish(graph);
+    graph_pub.publish(graph);
 
     if (min_time_reachability.get_best_cost() > 0.0) {
       if (min_time_reachability.get_best_cost() < last_best_cost || no_soln) {
         ROS_INFO("New solution found after %lf seconds.",
                  planner.get_planning_time());
-        //ROS_INFO("%lf > %lf now", last_best_cost, min_time_reachability.get_best_cost());
+        // ROS_INFO("%lf > %lf now", last_best_cost,
+        // min_time_reachability.get_best_cost());
         last_best_cost = min_time_reachability.get_best_cost();
         trajectory_t trajectory_final;
         min_time_reachability.get_solution(trajectory_final);
@@ -221,7 +224,8 @@ bool DownTheCLiFFPlanner::makePlan(
         // Cost of solution;
         performance_msg.data.push_back(last_best_cost);
         // Distance cost
-        performance_msg.data.push_back(cost_function_cliff(state_initial, &trajectory_final, trajectory_final.list_states.back(), true));
+        performance_msg.data.push_back(
+            cost_function_cliff(state_initial, &trajectory_final, NULL, true));
 
         // Nodes in tree
         performance_msg.data.push_back(graph.poses.size());
@@ -274,18 +278,15 @@ void DownTheCLiFFPlanner::publishPath(
   path_pub.publish(path);
 }
 
-double
-DownTheCLiFFPlanner::cost_function_cliff(typeparams::state *state_initial_in,
-                                         trajectory_t *trajectory_in,
-                                         typeparams::state *state_final_in,
-                                         bool only_distance_cost) {
+double DownTheCLiFFPlanner::cost_function_cliff(
+    typeparams::state *state_initial_in, trajectory_t *trajectory_in,
+    typeparams::state *state_final_in, bool only_distance_cost) {
 
   typedef typeparams::state state_t;
   typedef typeparams::input input_t;
 
   state_t *state_prev = state_initial_in;
   double total_cost = 0.0;
-  double distance_cost = 0.0;
 
   std::list<state_t *>::iterator iter_state =
       trajectory_in->list_states.begin();
@@ -297,10 +298,9 @@ DownTheCLiFFPlanner::cost_function_cliff(typeparams::state *state_initial_in,
     state_t *state_curr = *iter_state;
 
     // 1. Compute distance between the previous and current state.
-    double this_distance =
+    double this_distance_sq =
         pow(state_curr->state_vars[0] - state_prev->state_vars[0], 2) +
         pow(state_curr->state_vars[1] - state_prev->state_vars[1], 2);
-    this_distance = sqrt(this_distance);
 
     // 2. Compute the quaternion distance.
     double dot = cos(state_curr->state_vars[2] / 2.0) *
@@ -310,16 +310,15 @@ DownTheCLiFFPlanner::cost_function_cliff(typeparams::state *state_initial_in,
 
     double q_dist = pow(1.0 - fabs(dot), 2);
 
-    distance_cost += sqrt(pow(this_distance, 2) + q_dist);
     // Total distance for now.
-    total_cost += sqrt(pow(this_distance, 2) + q_dist);
+    double distance_cost = sqrt(this_distance_sq + q_dist);
 
     double this_time = (*input_curr)[0];
 
     double cliffcost = 0.0;
     Eigen::Vector2d V;
     V[0] = state_curr->state_vars[2];
-    V[1] = this_distance / this_time;
+    V[1] = sqrt(this_distance_sq) / this_time;
     double x = state_curr->state_vars[0];
     double y = state_curr->state_vars[1];
     double trust = (*cliffmap)(x, y).p * (*cliffmap)(x, y).q;
@@ -336,11 +335,14 @@ DownTheCLiFFPlanner::cost_function_cliff(typeparams::state *state_initial_in,
 
       double inc_cost = 0.0;
       if (Sigma.determinant() < 1e-4 && Sigma.determinant() > -1e-4)
-        inc_cost += 10000.00;
+        inc_cost = 10000.00;
       else
         inc_cost =
             sqrt((V - myu).transpose() * Sigma.inverse() * (V - myu)) * trust;
 
+      if (inc_cost < 0.0) {
+        printf("WHAT THE HOLY?!");
+      }
       // if (inc_cost > 10000.00)
       //  inc_cost = 10000.00f;
 
@@ -358,16 +360,16 @@ DownTheCLiFFPlanner::cost_function_cliff(typeparams::state *state_initial_in,
       }
     }
     // 3. Add the cliffcost
-    total_cost += cliffcost / 1000.0;
+    if (only_distance_cost) {
+      total_cost = total_cost + distance_cost;
+    } else {
+      total_cost = total_cost + distance_cost + (cliffcost / 5.0);
+    }
 
     state_prev = *iter_state;
     iter_state++;
   }
-  // return total_time;
-  if(only_distance_cost)
-    return distance_cost;
-  else 
-    return total_cost;
+  return total_cost;
 }
 }
 

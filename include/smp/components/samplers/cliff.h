@@ -32,6 +32,8 @@ class sampler_cliff : public sampler_base<typeparams> {
   typedef region<NUM_DIMENSIONS> region_t;
 
   region_t support;
+  region_t region_goal;
+  double bias{0.05};
 
   cliffmap_ros::CLiFFMapConstPtr cliffmap;
 
@@ -51,10 +53,12 @@ public:
   int sm_update_delete_edge(edge_t *edge_in);
 
   int sample(state_t **state_sample_out);
-  
+
   int sampleV2(state_t **state_sample_out);
 
   unsigned int get_total_rejections();
+
+  int set_goal_bias(double bias, const region_t &region_goal);
 
   inline void reset_rejections() { rejections = 0; }
 

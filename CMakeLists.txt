@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(cliff_planners)
 
-add_compile_options(-std=c++11)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_BUILD_TYPE Debug)
+set(MRPT_DONT_USE_DBG_LIBS 1)
+
 
 find_package(catkin REQUIRED COMPONENTS
   cliffmap_ros
@@ -16,6 +19,8 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(MRPT REQUIRED)
 
+find_package(Boost REQUIRED filesystem)
+
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES cliff_planners
@@ -24,31 +29,22 @@ catkin_package(
 
 include_directories(
   include
+  ${Boost_INCLUDE_DIRS}
   ${MRPT_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
 
-add_library(cliff_planners
-  src/down_the_cliff_planner.cpp
-)
-
+add_library(cliff_planners src/down_the_cliff_planner.cpp)
 add_dependencies(cliff_planners ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(cliff_planners ${catkin_LIBRARIES} ${MRPT_LIBRARIES})
 
-target_link_libraries(cliff_planners
-  ${catkin_LIBRARIES}
-  ${MRPT_LIBRARIES}
-)
+add_executable(standalone_planner src/standalone_planner.cpp)
+add_dependencies(standalone_planner ${catkin_EXPORTED_TARGETS})
+target_link_libraries(standalone_planner cliff_planners ${catkin_LIBRARIES})
 
-add_executable(standalone_planner
-  src/standalone_planner.cpp
-)
-
-add_dependencies(standalone_planner ${standalone_planner_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-target_link_libraries(standalone_planner
-  cliff_planners
-  ${catkin_LIBRARIES}
-)
+add_executable (bag_to_txt tools/bag_to_txt.cpp)
+add_dependencies (bag_to_txt ${catkin_EXPORTED_TARGETS})
+target_link_libraries(bag_to_txt ${catkin_LIBRARIES})
 #############
 ## Install ##
 #############
