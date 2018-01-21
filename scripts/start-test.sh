@@ -1,4 +1,4 @@
-rosbag record -o map4 
+
 rostopic pub -1 /pose geometry_msgs/PoseStamped "header:
   seq: 0
   stamp:
