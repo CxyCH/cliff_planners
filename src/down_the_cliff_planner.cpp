@@ -191,6 +191,8 @@ bool DownTheCLiFFPlanner::makePlan(
   std::chrono::duration<long int, std::ratio<1l, 1000000000l>> total_time =
       clock.now() - clock.now();
 
+  trajectory_t trajectory_final;
+
   while (ros::ok()) {
     auto start_time = clock.now();
     ++i;
@@ -213,7 +215,7 @@ bool DownTheCLiFFPlanner::makePlan(
         // ROS_INFO("%lf > %lf now", last_best_cost,
         // min_time_reachability.get_best_cost());
         last_best_cost = min_time_reachability.get_best_cost();
-        trajectory_t trajectory_final;
+
         min_time_reachability.get_solution(trajectory_final);
         publishPath(trajectory_final, plan);
 
@@ -243,7 +245,14 @@ bool DownTheCLiFFPlanner::makePlan(
   ROS_INFO("Total time: %lf seconds", total_time.count() / 1e9);
   if (plan.empty()) {
     ROS_ERROR("NO PLAN FOUND!");
-  }
+  } // else {
+  //   printf("Speeds: [");
+  //   for (const auto &speed :
+  //        this->getSpeeds(state_initial, &trajectory_final)) {
+  //     printf("%lf, ", speed);
+  //   }
+  //   printf("\b]\n");
+  // }
 
   return true;
 }
@@ -276,6 +285,42 @@ void DownTheCLiFFPlanner::publishPath(
   path.header.frame_id = "map";
   path.poses = plan;
   path_pub.publish(path);
+}
+
+std::vector<double>
+DownTheCLiFFPlanner::getSpeeds(typeparams::state *state_initial_in,
+                               trajectory_t *trajectory_in) {
+  std::vector<double> speeds;
+
+  typedef typeparams::state state_t;
+  typedef typeparams::input input_t;
+
+  state_t *state_prev = state_initial_in;
+
+  std::list<state_t *>::iterator iter_state =
+      trajectory_in->list_states.begin();
+
+  for (std::list<input_t *>::iterator iter_input =
+           trajectory_in->list_inputs.begin();
+       iter_input != trajectory_in->list_inputs.end(); iter_input++) {
+    input_t *input_curr = *iter_input;
+    state_t *state_curr = *iter_state;
+
+    // 1. Compute distance between the previous and current state.
+    double this_distance_sq =
+        ((state_curr->state_vars[0] - state_prev->state_vars[0]) *
+         (state_curr->state_vars[0] - state_prev->state_vars[0])) +
+        ((state_curr->state_vars[1] - state_prev->state_vars[1]) *
+         (state_curr->state_vars[1] - state_prev->state_vars[1]));
+
+    double this_time = (*input_curr)[0];
+
+    speeds.push_back(sqrt(this_distance_sq) / this_time);
+
+    state_prev = *iter_state;
+    iter_state++;
+  }
+  return speeds;
 }
 
 double DownTheCLiFFPlanner::cost_function_cliff(

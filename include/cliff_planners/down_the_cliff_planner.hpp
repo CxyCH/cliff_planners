@@ -32,8 +32,8 @@
 #include <nav_msgs/OccupancyGrid.h>
 #include <nav_msgs/Path.h>
 #include <ros/ros.h>
-#include <visualization_msgs/MarkerArray.h>
 #include <std_msgs/Float64MultiArray.h>
+#include <visualization_msgs/MarkerArray.h>
 
 // SMP TYPE DEFINITIONS -------
 // State, input, vertex_data, and edge_data definitions
@@ -102,6 +102,9 @@ protected:
                              trajectory_t *trajectory_in,
                              typeparams::state *state_final_in,
                              bool only_distance_cost = false);
+
+  std::vector<double> getSpeeds(typeparams::state *state_initial_in,
+                                trajectory_t *trajectory_in);
 
   void publishPath(const trajectory_t &trajectory_final,
                    std::vector<geometry_msgs::PoseStamped> &plan);
