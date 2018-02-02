@@ -107,7 +107,6 @@ int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sampleV2(
 
   state_t *state_new = new state_t;
 
-  bool accept = false;
   double randnum1 = double(rand()) / double(RAND_MAX);
   double randnum2 = double(rand()) / double(RAND_MAX);
 
@@ -121,11 +120,14 @@ int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sampleV2(
       *state_sample_out = state_new;
       return 1;
     }
+
     // obvious else
     // Generate an independent random variable for each axis.
     for (int i = 0; i < NUM_DIMENSIONS; i++)
       (*state_new)[i] = support.size[i] * rand() / (RAND_MAX + 1.0) -
                         support.size[i] / 2.0 + support.center[i];
+
+    if(no_cliff_sampling) break;
 
     double x = state_new->state_vars[0];
     double y = state_new->state_vars[1];

@@ -48,7 +48,7 @@ void DownTheCLiFFPlanner::initialize(std::string name,
                                      costmap_2d::Costmap2DROS *costmap_ros) {
 
   std::string cliffmapFileName;
-  ros::NodeHandle private_nh("~/" + name);
+  private_nh = ros::NodeHandle("~/" + name);
   private_nh.param<std::string>("cliffmap_file_name", cliffmapFileName, "");
 
   if (cliffmapFileName.empty()) {
@@ -121,9 +121,20 @@ bool DownTheCLiFFPlanner::makePlan(
 
   extender.set_turning_radius(0.5);
 
-  min_time_reachability.set_cost_function(std::bind(
-      &DownTheCLiFFPlanner::cost_function_cliff, this, std::placeholders::_1,
-      std::placeholders::_2, std::placeholders::_3, false));
+  bool no_cliff_costs = false;
+  private_nh.param("no_cliff_costs", no_cliff_costs, false);
+
+  if (no_cliff_costs) {
+    min_time_reachability.set_cost_function(std::bind(
+        &DownTheCLiFFPlanner::cost_function_cliff, this, std::placeholders::_1,
+        std::placeholders::_2, std::placeholders::_3, true));
+    ROS_INFO("Only using distance costs.");
+  } else {
+    min_time_reachability.set_cost_function(std::bind(
+        &DownTheCLiFFPlanner::cost_function_cliff, this, std::placeholders::_1,
+        std::placeholders::_2, std::placeholders::_3, false));
+    ROS_INFO("Using CLiFF costs and distance costs.");
+  }
 
   RRTStar planner(sampler, distance_evaluator, extender, *collision_checker,
                   min_time_reachability, min_time_reachability);
@@ -178,10 +189,21 @@ bool DownTheCLiFFPlanner::makePlan(
   ros::Time t = ros::Time::now();
   // 3. RUN THE PLANNER
   int i = 0;
-  double planning_time = 5.0;
 
-  nh.param("planning_time", planning_time, 60.0);
+  double planning_time = 5.0;
+  private_nh.param("planning_time", planning_time, 60.0);
   ROS_INFO("Planning time limit is %lf sec.", planning_time);
+
+  bool no_cliff_sampling = false;
+  private_nh.param("no_cliff_sampling", no_cliff_sampling, false);
+
+  if (no_cliff_sampling) {
+    ROS_INFO("Using Uniform Sampler.");
+    sampler.dontUseCLiFFSampling();
+  } else {
+    ROS_INFO("Using CLiFFMap Sampler.");
+  }
+
   double last_best_cost = -1.0;
 
   graph.header.frame_id = "map";
@@ -190,8 +212,6 @@ bool DownTheCLiFFPlanner::makePlan(
   std::chrono::steady_clock clock;
   std::chrono::duration<long int, std::ratio<1l, 1000000000l>> total_time =
       clock.now() - clock.now();
-
-  trajectory_t trajectory_final;
 
   while (ros::ok()) {
     auto start_time = clock.now();
@@ -210,13 +230,17 @@ bool DownTheCLiFFPlanner::makePlan(
 
     if (min_time_reachability.get_best_cost() > 0.0) {
       if (min_time_reachability.get_best_cost() < last_best_cost || no_soln) {
-        ROS_INFO("New solution found after %lf seconds.",
-                 planner.get_planning_time());
-        // ROS_INFO("%lf > %lf now", last_best_cost,
-        // min_time_reachability.get_best_cost());
+        ROS_INFO("New solution found after %lf seconds. Cost: %lf",
+                 planner.get_planning_time(), last_best_cost);
+
         last_best_cost = min_time_reachability.get_best_cost();
 
+        trajectory_t trajectory_final;
         min_time_reachability.get_solution(trajectory_final);
+        ROS_INFO("New solution has: %ld states and %ld inputs.",
+                 trajectory_final.list_states.size(),
+                 trajectory_final.list_inputs.size());
+
         publishPath(trajectory_final, plan);
 
         // Performance measures
@@ -224,7 +248,8 @@ bool DownTheCLiFFPlanner::makePlan(
         // Time to solution;
         performance_msg.data.push_back(planner.get_planning_time());
         // Cost of solution;
-        performance_msg.data.push_back(last_best_cost);
+        performance_msg.data.push_back(
+            cost_function_cliff(state_initial, &trajectory_final, NULL, false));
         // Distance cost
         performance_msg.data.push_back(
             cost_function_cliff(state_initial, &trajectory_final, NULL, true));
@@ -276,6 +301,7 @@ void DownTheCLiFFPlanner::publishPath(
   ros::Duration d(0);
   for (const auto &time : trajectory_final.list_inputs) {
     d = d + ros::Duration((*time)[0]);
+    plan[k].header.seq = k;
     plan[k].header.stamp = ros::Time(0) + d;
     plan[k].header.frame_id = "map";
     k++;
@@ -363,7 +389,7 @@ double DownTheCLiFFPlanner::cost_function_cliff(
     double cliffcost = 0.0;
     Eigen::Vector2d V;
     V[0] = state_curr->state_vars[2];
-    V[1] = sqrt(this_distance_sq) / this_time;
+    V[1] = 1.0; // sqrt(this_distance_sq) / this_time;
     double x = state_curr->state_vars[0];
     double y = state_curr->state_vars[1];
     double trust = (*cliffmap)(x, y).p * (*cliffmap)(x, y).q;

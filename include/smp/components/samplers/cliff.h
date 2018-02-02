@@ -39,6 +39,11 @@ class sampler_cliff : public sampler_base<typeparams> {
 
   unsigned int rejections;
 
+  /**
+   * When this parameter is set, only a goal-biased uniform sampling is done.
+   */
+  bool no_cliff_sampling{false};
+
 public:
   sampler_cliff();
   sampler_cliff(const cliffmap_ros::CLiFFMapConstPtr &map);
@@ -57,6 +62,8 @@ public:
   int sampleV2(state_t **state_sample_out);
 
   unsigned int get_total_rejections();
+
+  inline void dontUseCLiFFSampling() {no_cliff_sampling = true;}
 
   int set_goal_bias(double bias, const region_t &region_goal);
 

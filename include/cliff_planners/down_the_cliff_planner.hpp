@@ -69,6 +69,8 @@ class DownTheCLiFFPlanner : public nav_core::BaseGlobalPlanner {
 
 private:
   ros::NodeHandle nh;
+  ros::NodeHandle private_nh;
+
   CLiFFMapSampler sampler;
   ExtenderDubins extender;
   std::shared_ptr<CollisionCheckerMCMRPT> collision_checker;
