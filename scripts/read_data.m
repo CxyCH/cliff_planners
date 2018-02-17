@@ -70,14 +70,13 @@ j = 1;
 % %   if(mod(i,5) ~= 0)
 % %     continue;
 % %   end
-l = str2num(char(SortedPosesLast(1,1)));
+%   f = str2num(char(SortedPosesFirst(i,1)));
+%   l = str2num(char(SortedPosesLast(i,1)));
 %   
-figure(1);
-plot(l(:,1),l(:,2)); hold on;
-text(l(15,1), l(15,2), "Path", 'FontSize', 14);
-text(l(1,1), l(1,2), "Start", 'FontSize', 14);
-text(l(end,1), l(end,2), "Goal", 'FontSize', 14);
-
+%   figure(1);
+%   plot(f(:,1),f(:,2)); hold on;
+%   idx = uint16(rand()*size(f,1));
+%   text(f(idx,1), f(idx,2), string(i), 'FontSize', 10);
 %   legend_str_first(j) = strcat(string(i), ' :', string(SortedPMFirst(i,2)), ', ',  string(SortedPMFirst(i,1)), ', ', string(SortedPMFirst(i,3)), ', ', string(SortedPMFirst(i,4)), ', ', string(SortedPMFirst(i,5)));
 %   
 %   figure(2);
@@ -100,7 +99,7 @@ CostPMLast = [median(SortedPMLast(:,1)) std(SortedPMLast(:,1));...
   mean(SortedPMLast(:,4)) std(SortedPMLast(:,4));...
   mean(SortedPMLast(:,5)) std(SortedPMLast(:,5))];
 
-Success = size(last,1) / 25;
+Success = size(last,1) / 50;
 % figure(1);
 % colormap gray;
 % %subplot(122), 

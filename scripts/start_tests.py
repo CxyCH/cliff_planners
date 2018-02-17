@@ -34,7 +34,7 @@ rate = rospy.Rate(10);
 
 iteration = 0;
 
-while iteration < 50 and not rospy.is_shutdown():
+while iteration < 25 and not rospy.is_shutdown():
     print('Starting demo')
     bagStart_p = subprocess.Popen('rosbag record -o n_' + mapname + ' /performance_measures /path', shell=True, preexec_fn=os.setsid)
     pose_pub.publish(start)
@@ -52,6 +52,6 @@ while iteration < 50 and not rospy.is_shutdown():
     print('Killed rosbag')
     print('OK')
     time.sleep(2)
-    iteration = iteration + 1    
+    iteration = iteration + 1
 print('50 runs completed for ' + mapname)
 
