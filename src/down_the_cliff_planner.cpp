@@ -121,19 +121,26 @@ bool DownTheCLiFFPlanner::makePlan(
 
   extender.set_turning_radius(0.5);
 
-  bool no_cliff_costs = false;
-  private_nh.param("no_cliff_costs", no_cliff_costs, false);
+  std::string cost_type = "cliff";
+  private_nh.param("cost_type", cost_type, std::string("cliff"));
 
-  if (no_cliff_costs) {
+  char blue[] = {0x1b, '[', '1', ';', '3', '4', 'm', 0};
+
+  if (cost_type == "distance") {
     min_time_reachability.set_cost_function(std::bind(
         &DownTheCLiFFPlanner::cost_function_cliff, this, std::placeholders::_1,
-        std::placeholders::_2, std::placeholders::_3, true));
-    ROS_INFO("Only using distance costs.");
-  } else {
+        std::placeholders::_2, std::placeholders::_3, true, false));
+    std::cout << blue << "ONLY USING DISTANCE COSTS.\n";
+  } else if (cost_type == "cliff") {
     min_time_reachability.set_cost_function(std::bind(
         &DownTheCLiFFPlanner::cost_function_cliff, this, std::placeholders::_1,
-        std::placeholders::_2, std::placeholders::_3, false));
-    ROS_INFO("Using CLiFF costs and distance costs.");
+        std::placeholders::_2, std::placeholders::_3, false, false));
+    std::cout << blue << "USING CLIFF COSTS AND DISTANCE COSTS.\n";
+  } else if (cost_type == "upstream") {
+    min_time_reachability.set_cost_function(std::bind(
+        &DownTheCLiFFPlanner::cost_function_cliff, this, std::placeholders::_1,
+        std::placeholders::_2, std::placeholders::_3, false, true));
+    std::cout << blue << "USING UPSTREAM COSTS AND DISTANCE COSTS.\n";
   }
 
   RRTStar planner(sampler, distance_evaluator, extender, *collision_checker,
@@ -213,6 +220,7 @@ bool DownTheCLiFFPlanner::makePlan(
   std::chrono::duration<long int, std::ratio<1l, 1000000000l>> total_time =
       clock.now() - clock.now();
 
+  trajectory_t trajectory_final;
   while (ros::ok()) {
     auto start_time = clock.now();
     ++i;
@@ -230,12 +238,10 @@ bool DownTheCLiFFPlanner::makePlan(
 
     if (min_time_reachability.get_best_cost() > 0.0) {
       if (min_time_reachability.get_best_cost() < last_best_cost || no_soln) {
-        ROS_INFO("New solution found after %lf seconds. Cost: %lf",
-                 planner.get_planning_time(), last_best_cost);
+        ROS_INFO("New solution found after %lf seconds.",
+                 planner.get_planning_time());
 
         last_best_cost = min_time_reachability.get_best_cost();
-
-        trajectory_t trajectory_final;
         min_time_reachability.get_solution(trajectory_final);
         ROS_INFO("New solution has: %ld states and %ld inputs.",
                  trajectory_final.list_states.size(),
@@ -248,11 +254,14 @@ bool DownTheCLiFFPlanner::makePlan(
         // Time to solution;
         performance_msg.data.push_back(planner.get_planning_time());
         // Cost of solution;
-        performance_msg.data.push_back(
-            cost_function_cliff(state_initial, &trajectory_final, NULL, false));
+        performance_msg.data.push_back(cost_function_cliff(
+            state_initial, &trajectory_final, NULL, false, false));
         // Distance cost
-        performance_msg.data.push_back(
-            cost_function_cliff(state_initial, &trajectory_final, NULL, true));
+        performance_msg.data.push_back(cost_function_cliff(
+            state_initial, &trajectory_final, NULL, true, false));
+        // Upstream cost
+        performance_msg.data.push_back(cost_function_cliff(
+            state_initial, &trajectory_final, NULL, false, true));
 
         // Nodes in tree
         performance_msg.data.push_back(graph.poses.size());
@@ -351,7 +360,12 @@ DownTheCLiFFPlanner::getSpeeds(typeparams::state *state_initial_in,
 
 double DownTheCLiFFPlanner::cost_function_cliff(
     typeparams::state *state_initial_in, trajectory_t *trajectory_in,
-    typeparams::state *state_final_in, bool only_distance_cost) {
+    typeparams::state *state_final_in, bool only_distance_cost,
+    bool upstream_cost) {
+
+  if (upstream_cost)
+    return cost_function_upstream(state_initial_in, trajectory_in,
+                                  state_final_in);
 
   typedef typeparams::state state_t;
   typedef typeparams::input input_t;
@@ -436,6 +450,78 @@ double DownTheCLiFFPlanner::cost_function_cliff(
     } else {
       total_cost = total_cost + distance_cost + (cliffcost / 5.0);
     }
+
+    state_prev = *iter_state;
+    iter_state++;
+  }
+  return total_cost;
+}
+
+double
+DownTheCLiFFPlanner::cost_function_upstream(typeparams::state *state_initial_in,
+                                            trajectory_t *trajectory_in,
+                                            typeparams::state *state_final_in) {
+
+  typedef typeparams::state state_t;
+  typedef typeparams::input input_t;
+
+  state_t *state_prev = state_initial_in;
+  double total_cost = 0.0;
+
+  std::list<state_t *>::iterator iter_state =
+      trajectory_in->list_states.begin();
+
+  for (std::list<input_t *>::iterator iter_input =
+           trajectory_in->list_inputs.begin();
+       iter_input != trajectory_in->list_inputs.end(); iter_input++) {
+    input_t *input_curr = *iter_input;
+    state_t *state_curr = *iter_state;
+
+    // 1. Compute distance between the previous and current state.
+    double this_distance_sq =
+        pow(state_curr->state_vars[0] - state_prev->state_vars[0], 2) +
+        pow(state_curr->state_vars[1] - state_prev->state_vars[1], 2);
+
+    // 2. Compute the quaternion distance.
+    double dot = cos(state_curr->state_vars[2] / 2.0) *
+                     cos(state_prev->state_vars[2] / 2.0) +
+                 sin(state_curr->state_vars[2] / 2.0 *
+                     sin(state_prev->state_vars[2] / 2.0));
+
+    double q_dist = pow(1.0 - fabs(dot), 2);
+
+    // Total distance for now.
+    double distance_cost = sqrt(this_distance_sq + q_dist);
+
+    double this_time = (*input_curr)[0];
+
+    double upstreamCost = 0.0;
+    Eigen::Vector2d V;
+    V[0] = state_curr->state_vars[2];
+    V[1] = sqrt(this_distance_sq) / this_time;
+    double x = state_curr->state_vars[0];
+    double y = state_curr->state_vars[1];
+    for (const auto &dist : (*cliffmap)(x, y).distributions) {
+      Eigen::Vector2d myu;
+      myu[0] = dist.getMeanHeading();
+      myu[1] = dist.getMeanSpeed();
+
+      double inc_cost = myu[1] - (myu[1] * cos(myu[0]) * cos(V[0]) +
+                                  myu[1] * sin(myu[0]) * sin(V[0]));
+
+      upstreamCost += inc_cost;
+
+      if (isnan(upstreamCost)) {
+        std::cout << "V: " << V << std::endl;
+        std::cout << "myu: " << myu << std::endl;
+        std::cout << "Incremental: " << inc_cost << std::endl;
+        printf("upstreamCost: %lf\n", upstreamCost);
+        printf("_________________________\n");
+        std::cout << "SHIT!" << std::endl;
+      }
+    }
+    // 3. Add the upstreamCost
+    total_cost = total_cost + distance_cost + upstreamCost;
 
     state_prev = *iter_state;
     iter_state++;

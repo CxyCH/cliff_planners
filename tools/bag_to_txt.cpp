@@ -12,7 +12,10 @@ struct Data {
   double cost;
   long int nodes;
   double distance;
-  Data(double pt_, double cost_, double distance_, long int nodes_) {
+  double upstream;
+  Data(double pt_, double cost_, double distance_, double upstream_,
+       long int nodes_) {
+    upstream = upstream_;
     pt = pt_;
     distance = distance_;
     nodes = nodes_;
@@ -54,20 +57,22 @@ int main(int argn, char *argv[]) {
       std_msgs::Float64MultiArray::ConstPtr pm =
           m.instantiate<std_msgs::Float64MultiArray>();
       if (pm != NULL) {
-        data.push_back(
-                       Data(pm->data[0], pm->data[1], pm->data[2], (long int)pm->data[3]));
+        data.push_back(Data(pm->data[0], pm->data[1], pm->data[2], pm->data[3],
+                            (long int)pm->data[4]));
         file_pm << data.back().pt << "," << data.back().cost << ","
-                << data.back().nodes << "," << data.back().distance << ";\n";
+                << data.back().upstream << "," << data.back().distance << ","
+                << data.back().nodes << ";\n";
       }
     }
 
     file_pm << "\n";
     if (data.size() > 0) {
       file_pm_last << data.back().pt << "," << data.back().cost << ","
-                   << data.back().nodes << "," << data.back().distance << ";\n";
+                   << data.back().upstream << "," << data.back().distance << ","
+                   << data.back().nodes << ";\n";
       file_pm_first << data.front().pt << "," << data.front().cost << ","
-                    << data.front().nodes << "," << data.front().distance
-                    << ";\n";
+                    << data.front().upstream << "," << data.front().distance << ","
+                    << data.front().nodes << ";\n";
     }
 
     rosbag::View view_path(
