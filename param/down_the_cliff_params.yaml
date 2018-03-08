@@ -1,2 +1,3 @@
 DownTheCLiFFPlanner:
-  cliffmap_file_name: "/home/chitt/workspace/cpp_ws/src/cliff_planners/cliffmaps/map1a.xml"
+  cliffmap_file_name: "/home/ksatyaki/workspace/cpp_ws/src/cliff_planners/cliffmaps/simple.xml"
+  planning_time: 10.0

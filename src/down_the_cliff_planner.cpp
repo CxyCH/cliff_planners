@@ -186,7 +186,7 @@ bool DownTheCLiFFPlanner::makePlan(
       2 * atan2(start.pose.orientation.z, start.pose.orientation.w);
 
   if (collision_checker->check_collision_state(state_initial) == 0) {
-    ROS_INFO("Start state is in collision. Planning failed.");
+    ROS_ERROR("Start state is in collision. Planning failed.");
     return false;
   } else
     ROS_INFO("Start state is not in collision.");
@@ -199,16 +199,16 @@ bool DownTheCLiFFPlanner::makePlan(
 
   double planning_time = 5.0;
   private_nh.param("planning_time", planning_time, 60.0);
-  ROS_INFO("Planning time limit is %lf sec.", planning_time);
+  std::cout << blue << "Planning time limit is " << planning_time << " seconds.\n";
 
   bool no_cliff_sampling = false;
   private_nh.param("no_cliff_sampling", no_cliff_sampling, false);
 
   if (no_cliff_sampling) {
-    ROS_INFO("Using Uniform Sampler.");
+    std::cout << blue << "Using Uniform Sampler.\n";
     sampler.dontUseCLiFFSampling();
   } else {
-    ROS_INFO("Using CLiFFMap Sampler.");
+    std::cout << blue << "Using CLiFFMap Sampler.\n";
   }
 
   double last_best_cost = -1.0;
@@ -433,7 +433,7 @@ double DownTheCLiFFPlanner::cost_function_cliff(
 
       cliffcost += inc_cost;
 
-      if (isnan(cliffcost)) {
+      if (std::isnan(cliffcost)) {
         std::cout << "Sigma: " << Sigma << std::endl;
         std::cout << "V: " << V << std::endl;
         std::cout << "myu: " << myu << std::endl;
@@ -511,7 +511,7 @@ DownTheCLiFFPlanner::cost_function_upstream(typeparams::state *state_initial_in,
 
       upstreamCost += inc_cost;
 
-      if (isnan(upstreamCost)) {
+      if (std::isnan(upstreamCost)) {
         std::cout << "V: " << V << std::endl;
         std::cout << "myu: " << myu << std::endl;
         std::cout << "Incremental: " << inc_cost << std::endl;

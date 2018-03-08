@@ -103,8 +103,7 @@ protected:
   double cost_function_cliff(typeparams::state *state_initial_in,
                              trajectory_t *trajectory_in,
                              typeparams::state *state_final_in,
-                             bool only_distance_cost,
-                             bool upstream_cost);
+                             bool only_distance_cost, bool upstream_cost);
 
   double cost_function_upstream(typeparams::state *state_initial_in,
                                 trajectory_t *trajectory_in,

@@ -17,9 +17,9 @@
 [map5bF map5bL map5bS] = read_data_plot('map5b');
 
 %
-ResultsL = [map1aL; map1cL; map2L; map3aL; map3bL; map4L; map5aL; map5bL]
+ResultsL = [map1aL; map1cL; map2L; map3aL; map3bL; map4L; map5aL; map5bL];
 
-ResultsF = [map1aF; map1cF; map2F; map3aF; map3bF; map4F; map5aF; map5bF]
+ResultsF = [map1aF; map1cF; map2F; map3aF; map3bF; map4F; map5aF; map5bF];
 
 fileIDF = fopen('dataF.txt','w');
 fileIDL = fopen('dataL.txt','w');
@@ -32,5 +32,7 @@ for j=1:8
   fprintf(fileIDF, '\\\\  \n');
   fprintf(fileIDL, '\\\\  \n');
 end
-  
-mean([map1aS, map1cS, map2S, map3aS, map3bS, map4S])
+
+MEANS = mean([map1aS, map1cS, map2S, map3aS, map3bS, map4S map5aS map5bS])
+
+[map1aS, map1cS, map2S, map3aS, map3bS, map4S map5aS map5bS]

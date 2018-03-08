@@ -1,12 +1,13 @@
 function [CostPMFirst, CostPMLast, Success] = read_data_plot(i)
+%i = "/home/ksatyaki/workspace/data_paper/more_bags/cliff/intersect"
 load('reds.mat');
 if(isinteger(i))
-  filenames = ["/home/chitt/workspace/data_paper/cliff_bags/map1a";...
-    "/home/chitt/workspace/data_paper/cliff_bags/map1c";...
-    "/home/chitt/workspace/data_paper/cliff_bags/map2";...
-    "/home/chitt/workspace/data_paper/cliff_bags/map3a";...
-    "/home/chitt/workspace/data_paper/cliff_bags/map3b";...
-    "/home/chitt/workspace/data_paper/cliff_bags/map4"];
+  filenames = ["/home/ksatyaki/workspace/data_paper/cliff_bags2/map1a";...
+    "/home/ksatyaki/workspace/data_paper/cliff_bags2/map1c";...
+    "/home/ksatyaki/workspace/data_paper/cliff_bags2/map2";...
+    "/home/ksatyaki/workspace/data_paper/cliff_bags2/map3a";...
+    "/home/ksatyaki/workspace/data_paper/cliff_bags2/map3b";...
+    "/home/ksatyaki/workspace/data_paper/cliff_bags2/map4"];
   
   fileName = filenames(i);
 else
@@ -18,7 +19,11 @@ pm_first = importdata(strcat(fileName, '-pm-first.txt'));
 last = importdata(strcat(fileName,'-paths-last.txt'));
 pm_last = importdata(strcat(fileName, '-pm-last.txt'));
 
-img = imread('/home/chitt/workspace/cpp_ws/src/smp_ros/maps/1world.pgm');
+%img = imread('/home/ksatyaki/workspace/cpp_ws/src/smp_ros/maps/1world.pgm');
+%img = imread('/home/ksatyaki/workspace/cpp_ws/src/smp_ros/maps/intersect.pgm');
+%img = flipud(img);
+%load('/home/ksatyaki/workspace/matlab/cs_toolbox/cs_toolbox_temporal/intersect.mat');
+%DM.PlotMapDirectionRich(0, 0.5);
 
 % figure(1);
 % %subplot(121),
@@ -58,8 +63,6 @@ burp_first_3 = burp_first(:,3);
 burp_first_4 = burp_first(:,4);
 burp_first_5 = burp_first(:,5);
 
-
-
 SortedPMFirst = [burp_first_1(IndicesFirst),burp_first_2(IndicesFirst),burp_first_3(IndicesFirst), burp_first_4(IndicesFirst), burp_first_5(IndicesFirst)];
 SortedPMLast = [burp_last_1(IndicesLast),burp_last_2(IndicesLast),burp_last_3(IndicesLast), burp_last_4(IndicesLast), burp_last_5(IndicesLast)];
 
@@ -72,11 +75,11 @@ j = 1;
 % %   end
 l = str2num(char(SortedPosesLast(1,1)));
 %   
-figure(1);
-plot(l(:,1),l(:,2)); hold on;
-text(l(15,1), l(15,2), "Path", 'FontSize', 14);
-text(l(1,1), l(1,2), "Start", 'FontSize', 14);
-text(l(end,1), l(end,2), "Goal", 'FontSize', 14);
+% figure(1);
+% plot(l(:,1),l(:,2), 'g', 'LineWidth', 3); hold on;
+% text(l(100,1), l(100,2), "DTC-RRT*", 'FontSize', 14);
+% text(l(1,1), l(1,2), "S", 'FontSize', 14);
+% text(l(end,1), l(end,2), "G", 'FontSize', 14);
 
 %   legend_str_first(j) = strcat(string(i), ' :', string(SortedPMFirst(i,2)), ', ',  string(SortedPMFirst(i,1)), ', ', string(SortedPMFirst(i,3)), ', ', string(SortedPMFirst(i,4)), ', ', string(SortedPMFirst(i,5)));
 %   
@@ -94,14 +97,13 @@ CostPMFirst = [mean(SortedPMFirst(:,1)) std(SortedPMFirst(:,1));...
   mean(SortedPMFirst(:,4)) std(SortedPMFirst(:,4));...
   mean(SortedPMFirst(:,5)) std(SortedPMFirst(:,5))];
 
-CostPMLast = [median(SortedPMLast(:,1)) std(SortedPMLast(:,1));...
+CostPMLast = [mean(SortedPMLast(:,1)) std(SortedPMLast(:,1));...
   mean(SortedPMLast(:,2)) std(SortedPMLast(:,2));...
   mean(SortedPMLast(:,3) - SortedPMLast(:,4)) std(SortedPMLast(:,3), SortedPMLast(:,4));...
   mean(SortedPMLast(:,4)) std(SortedPMLast(:,4));...
   mean(SortedPMLast(:,5)) std(SortedPMLast(:,5))];
 
 Success = size(last,1) / 25;
-% figure(1);
 % colormap gray;
 % %subplot(122), 
 % l1 = legend(legend_str_first);

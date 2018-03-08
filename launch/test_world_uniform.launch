@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<launch>
+
+  <!-- 0. Args for debugging -->
+  <arg name="debug" default="false" />
+  <arg unless="$(arg debug)" name="launch_prefix" value="" />
+  <arg     if="$(arg debug)" name="launch_prefix" value="gdb --ex run --args" />
+
+  <node name="static_tf0" pkg="tf" type="static_transform_publisher" args="2 0 0 0 0 0 /map /base_link 100"/>
+
+  <!-- Node 2: Map server -->
+  <node name="map_server" type="map_server" pkg="map_server" args="$(find smp_ros)/maps/1world.yaml"/>
+
+  <!-- Node 3: Costmap -->
+  <!--node name="costmap_node" type="costmap_2d_node" pkg="costmap_2d">
+  </node -->
+
+  <!-- Node 4: Rviz -->
+  <node name="rviz" type="rviz" pkg="rviz" args="-d $(find smp_ros)/launch/rviz.rviz">
+    <remap from="move_base_simple/goal" to="pose" />
+  </node>
+
+  <arg name="cliffmap" default="map1a"/>
+  <node name="standalone" type="standalone_planner" pkg="cliff_planners" output="screen" launch-prefix="$(arg launch_prefix)">
+    <param name="DownTheCLiFFPlanner/cliffmap_file_name" value="/home/ksatyaki/workspace/cpp_ws/src/cliff_planners/cliffmaps/$(arg cliffmap).xml"/>
+    <rosparam file="$(find cliff_planners)/param/down_the_cliff_params.yaml" command="load" />
+    <rosparam file="$(find cliff_planners)/param/costmap_params.yaml" command="load" ns="my_costmap" />
+  </node>
+</launch>

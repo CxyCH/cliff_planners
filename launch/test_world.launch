@@ -22,7 +22,7 @@
 
   <arg name="cliffmap" default="map1a"/>
   <node name="standalone" type="standalone_planner" pkg="cliff_planners" output="screen" launch-prefix="$(arg launch_prefix)">
-    <param name="DownTheCLiFFPlanner/cliffmap_file_name" value="/home/chitt/workspace/cpp_ws/src/cliff_planners/cliffmaps/$(arg cliffmap).xml"/>
+    <param name="DownTheCLiFFPlanner/cliffmap_file_name" value="/home/ksatyaki/workspace/cpp_ws/src/cliff_planners/cliffmaps/$(arg cliffmap).xml"/>
     <!-- rosparam file="$(find cliff_planners)/param/down_the_cliff_params.yaml" command="load" / -->
     <rosparam file="$(find cliff_planners)/param/costmap_params.yaml" command="load" ns="my_costmap" />
   </node>
