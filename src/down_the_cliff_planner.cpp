@@ -396,7 +396,7 @@ double DownTheCLiFFPlanner::cost_function_cliff(
     double q_dist = pow(1.0 - fabs(dot), 2);
 
     // Total distance for now.
-    double distance_cost = sqrt(this_distance_sq + q_dist);
+    double distance_cost = sqrt(this_distance_sq) + 10.0*sqrt(q_dist);
 
     double this_time = (*input_curr)[0];
 

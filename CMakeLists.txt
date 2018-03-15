@@ -42,9 +42,6 @@ add_executable(standalone_planner src/standalone_planner.cpp)
 add_dependencies(standalone_planner ${catkin_EXPORTED_TARGETS})
 target_link_libraries(standalone_planner cliff_planners ${catkin_LIBRARIES})
 
-add_executable (bag_to_txt tools/bag_to_txt.cpp)
-add_dependencies (bag_to_txt ${catkin_EXPORTED_TARGETS})
-target_link_libraries(bag_to_txt ${catkin_LIBRARIES})
 #############
 ## Install ##
 #############
