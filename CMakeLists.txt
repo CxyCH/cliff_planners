@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   cliffmap_ros
   geometry_msgs
   roscpp
+  costmap_2d
   smp_ros
   std_msgs
   tf
@@ -24,7 +25,7 @@ find_package(Boost REQUIRED filesystem)
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES cliff_planners
-  CATKIN_DEPENDS cliffmap_ros geometry_msgs roscpp smp_ros std_msgs tf nav_core visualization_msgs
+  CATKIN_DEPENDS cliffmap_ros geometry_msgs roscpp smp_ros std_msgs tf nav_core visualization_msgs costmap_2d
 )
 
 include_directories(
