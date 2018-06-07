@@ -6,12 +6,13 @@
 */
 
 #include <memory>
-#include <smp/common/region.h>
-#include <smp/components/samplers/base.h>
+#include <smp/region.hpp>
+#include <smp/samplers/base.hpp>
 
 #include <cliffmap_ros/cliffmap.hpp>
 
 namespace smp {
+namespace samplers {
 
 //! Implements the sampler components that relies on uniform sampling.
 /*!
@@ -19,20 +20,11 @@ namespace smp {
 
   \ingroup samplers
 */
-template <class typeparams, int NUM_DIMENSIONS>
-class sampler_cliff : public sampler_base<typeparams> {
+template <class State, int NUM_DIMENSIONS>
+class CLiFF : public Base<State> {
 
-  typedef typename typeparams::state state_t;
-  typedef typename typeparams::vertex_data vertex_data_t;
-  typedef typename typeparams::edge_data edge_data_t;
-
-  typedef vertex<typeparams> vertex_t;
-  typedef edge<typeparams> edge_t;
-
-  typedef region<NUM_DIMENSIONS> region_t;
-
-  region_t support;
-  region_t region_goal;
+  Region<NUM_DIMENSIONS> support;
+  Region<NUM_DIMENSIONS> region_goal;
   double bias{0.05};
 
   cliffmap_ros::CLiFFMapConstPtr cliffmap;
@@ -45,27 +37,19 @@ class sampler_cliff : public sampler_base<typeparams> {
   bool no_cliff_sampling{false};
 
 public:
-  sampler_cliff();
-  sampler_cliff(const cliffmap_ros::CLiFFMapConstPtr &map);
-  ~sampler_cliff();
+  CLiFF();
+  CLiFF(const cliffmap_ros::CLiFFMapConstPtr &map);
+  ~CLiFF();
 
-  int sm_update_insert_vertex(vertex_t *vertex_in);
+  int sample(State **state_sample_out);
 
-  int sm_update_insert_edge(edge_t *edge_in);
+  int sampleV2(State **state_sample_out);
 
-  int sm_update_delete_vertex(vertex_t *vertex_in);
-
-  int sm_update_delete_edge(edge_t *edge_in);
-
-  int sample(state_t **state_sample_out);
-
-  int sampleV2(state_t **state_sample_out);
-  
   unsigned int get_total_rejections();
 
-  inline void dontUseCLiFFSampling() {no_cliff_sampling = true;}
+  inline void dontUseCLiFFSampling() { no_cliff_sampling = true; }
 
-  int set_goal_bias(double bias, const region_t &region_goal);
+  int set_goal_bias(double bias, const Region<NUM_DIMENSIONS> &region_goal);
 
   inline void reset_rejections() { rejections = 0; }
 
@@ -91,4 +75,7 @@ public:
    */
   int set_support(const cliffmap_ros::CLiFFMapConstPtr &map);
 };
-}
+} // namespace samplers
+} // namespace smp
+
+#include <smp/samplers/cliff_impl.hpp>

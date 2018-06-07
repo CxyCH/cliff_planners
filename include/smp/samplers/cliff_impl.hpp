@@ -1,64 +1,29 @@
 #pragma once
 
-#include <cstdlib>
-#include <iostream>
-
-#include <smp/common/region.hpp>
-#include <smp/components/samplers/base.hpp>
-#include <smp/components/samplers/cliff.h>
-
-template <class typeparams, int NUM_DIMENSIONS>
-int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sm_update_insert_vertex(
-    vertex_t *vertex_in) {
-
-  return 1;
-}
-
-template <class typeparams, int NUM_DIMENSIONS>
-int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sm_update_insert_edge(
-    edge_t *edge_in) {
-
-  return 1;
-}
-
-template <class typeparams, int NUM_DIMENSIONS>
-int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sm_update_delete_vertex(
-    vertex_t *vertex_in) {
-
-  return 1;
-}
-
-template <class typeparams, int NUM_DIMENSIONS>
-int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sm_update_delete_edge(
-    edge_t *edge_in) {
-
-  return 1;
-}
-
-template <class typeparams, int NUM_DIMENSIONS>
-smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sampler_cliff(
+template <class State, int NUM_DIMENSIONS>
+smp::samplers::CLiFF<State, NUM_DIMENSIONS>::CLiFF(
     const cliffmap_ros::CLiFFMapConstPtr &map) {
   this->set_support(map);
   rejections = 0;
 }
 
-template <class typeparams, int NUM_DIMENSIONS>
-smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sampler_cliff() {
+template <class State, int NUM_DIMENSIONS>
+smp::samplers::CLiFF<State, NUM_DIMENSIONS>::CLiFF() {
   rejections = 0;
 }
 
-template <class typeparams, int NUM_DIMENSIONS>
-smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::~sampler_cliff() {}
+template <class State, int NUM_DIMENSIONS>
+smp::samplers::CLiFF<State, NUM_DIMENSIONS>::~CLiFF() {}
 
-template <class typeparams, int NUM_DIMENSIONS>
+template <class State, int NUM_DIMENSIONS>
 unsigned int
-smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::get_total_rejections() {
+smp::samplers::CLiFF<State, NUM_DIMENSIONS>::get_total_rejections() {
   return rejections;
 }
 
-template <class typeparams, int NUM_DIMENSIONS>
-int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sample(
-    state_t **state_sample_out) {
+template <class State, int NUM_DIMENSIONS>
+int smp::samplers::CLiFF<State, NUM_DIMENSIONS>::sample(
+    State **state_sample_out) {
 
   return sampleV2(state_sample_out);
 
@@ -67,7 +32,7 @@ int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sample(
   if (NUM_DIMENSIONS <= 0)
     return 0;
 
-  state_t *state_new = new state_t;
+  State *state_new = new State;
 
   bool accept = false;
   double randnum = double(rand()) / double(RAND_MAX);
@@ -97,14 +62,14 @@ int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sample(
   */
 }
 
-template <class typeparams, int NUM_DIMENSIONS>
-int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sampleV2(
-    state_t **state_sample_out) {
+template <class State, int NUM_DIMENSIONS>
+int smp::samplers::CLiFF<State, NUM_DIMENSIONS>::sampleV2(
+    State **state_sample_out) {
 
   if (NUM_DIMENSIONS <= 0)
     return 0;
 
-  state_t *state_new = new state_t;
+  State *state_new = new State;
 
   double randnum1 = double(rand()) / double(RAND_MAX);
   double randnum2 = double(rand()) / double(RAND_MAX);
@@ -174,14 +139,14 @@ int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sampleV2(
   return 1;
 }
 
-// template <class typeparams, int NUM_DIMENSIONS>
-// int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sampleV3(
-//     state_t **state_sample_out) {
+// template <class State, int NUM_DIMENSIONS>
+// int smp::samplers::CLiFF<State, NUM_DIMENSIONS>::sampleV3(
+//     State **state_sample_out) {
 
 //   if (NUM_DIMENSIONS <= 0)
 //     return 0;
 
-//   state_t *state_new = new state_t;
+//   State *state_new = new State;
 
 //   double randnum1 = double(rand()) / double(RAND_MAX);
 //   double randnum2 = double(rand()) / double(RAND_MAX);
@@ -237,8 +202,8 @@ int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::sampleV2(
 // return 1;
 // }
 
-template <class typeparams, int NUM_DIMENSIONS>
-int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::set_support(
+template <class State, int NUM_DIMENSIONS>
+int smp::samplers::CLiFF<State, NUM_DIMENSIONS>::set_support(
     const cliffmap_ros::CLiFFMapConstPtr &map) {
   cliffmap = map;
   support.center[0] = (cliffmap->getXMax() + cliffmap->getXMin()) / 2.0;
@@ -251,9 +216,9 @@ int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::set_support(
   return 1;
 }
 
-template <class typeparams, int NUM_DIMENSIONS>
-int smp::sampler_cliff<typeparams, NUM_DIMENSIONS>::set_goal_bias(
-    double bias, const region_t &region_goal) {
+template <class State, int NUM_DIMENSIONS>
+int smp::samplers::CLiFF<State, NUM_DIMENSIONS>::set_goal_bias(
+    double bias, const Region<NUM_DIMENSIONS> &region_goal) {
   this->bias = bias;
   this->region_goal = region_goal;
   time_t t;

@@ -103,8 +103,9 @@ void DownTheCLiFFPlanner::initialize(std::string name,
     ROS_INFO("DownTheCLiFFPlanner got a polygon footprint.");
   }
 
-  collision_checker = std::shared_ptr<CollisionCheckerMCMRPT>(
-      new CollisionCheckerMCMRPT(map, 0.15, footprint));
+  collision_checker = std::make_shared<
+      smp::collision_checkers::MultipleCirclesMRPT<State, Input>>(map, 0.15,
+                                                                  footprint);
 
   sampler.set_support(cliffmap);
 }
@@ -114,12 +115,15 @@ bool DownTheCLiFFPlanner::makePlan(
     const geometry_msgs::PoseStamped &goal,
     std::vector<geometry_msgs::PoseStamped> &plan) {
 
-  KDTreeDistanceEvaluator distance_evaluator;
-  MinimumTimeReachability min_time_reachability;
+  smp::distance_evaluators::KDTree<State, Input, VertexData, EdgeData, 3>
+      distance_evaluator;
+
+  smp::multipurpose::MinimumTimeReachability<State, Input, 3>
+      min_time_reachability;
 
   marker_pub.publish(ma);
 
-  extender.set_turning_radius(0.5);
+  // extender.set_turning_radius(0.5);
 
   std::string cost_type = "cliff";
   private_nh.param("cost_type", cost_type, std::string("cliff"));
@@ -143,8 +147,9 @@ bool DownTheCLiFFPlanner::makePlan(
     std::cout << blue << "USING UPSTREAM COSTS AND DISTANCE COSTS.\n";
   }
 
-  RRTStar planner(sampler, distance_evaluator, extender, *collision_checker,
-                  min_time_reachability, min_time_reachability);
+  smp::planners::RRTStar<State, Input, VertexData, EdgeData, 3> planner(
+      sampler, distance_evaluator, extender, *collision_checker,
+      min_time_reachability, min_time_reachability);
 
   planner.parameters.set_phase(2);
   planner.parameters.set_gamma(std::max(map->getXMax(), map->getYMax()));
@@ -162,7 +167,7 @@ bool DownTheCLiFFPlanner::makePlan(
            2 * atan2(goal.pose.orientation.z, goal.pose.orientation.w) * 180 /
                M_PI);
 
-  smp::region<3> region_goal;
+  smp::Region<3> region_goal;
   region_goal.center[0] = goal.pose.position.x;
   region_goal.size[0] = 0.1;
 
@@ -178,7 +183,7 @@ bool DownTheCLiFFPlanner::makePlan(
 
   sampler.set_goal_bias(0.05, region_goal);
 
-  StateDubins *state_initial = new StateDubins;
+  State *state_initial = new State;
 
   state_initial->state_vars[0] = start.pose.position.x;
   state_initial->state_vars[1] = start.pose.position.y;
@@ -199,7 +204,8 @@ bool DownTheCLiFFPlanner::makePlan(
 
   double planning_time = 5.0;
   private_nh.param("planning_time", planning_time, 60.0);
-  std::cout << blue << "Planning time limit is " << planning_time << " seconds.\n";
+  std::cout << blue << "Planning time limit is " << planning_time
+            << " seconds.\n";
 
   bool no_cliff_sampling = false;
   private_nh.param("no_cliff_sampling", no_cliff_sampling, false);
@@ -220,7 +226,7 @@ bool DownTheCLiFFPlanner::makePlan(
   std::chrono::duration<long int, std::ratio<1l, 1000000000l>> total_time =
       clock.now() - clock.now();
 
-  trajectory_t trajectory_final;
+  Trajectory trajectory_final;
   while (ros::ok()) {
     auto start_time = clock.now();
     ++i;
@@ -279,20 +285,13 @@ bool DownTheCLiFFPlanner::makePlan(
   ROS_INFO("Total time: %lf seconds", total_time.count() / 1e9);
   if (plan.empty()) {
     ROS_ERROR("NO PLAN FOUND!");
-  } // else {
-  //   printf("Speeds: [");
-  //   for (const auto &speed :
-  //        this->getSpeeds(state_initial, &trajectory_final)) {
-  //     printf("%lf, ", speed);
-  //   }
-  //   printf("\b]\n");
-  // }
-
+  }
+  
   return true;
 }
 
 void DownTheCLiFFPlanner::publishPath(
-    const trajectory_t &trajectory_final,
+    const Trajectory &trajectory_final,
     std::vector<geometry_msgs::PoseStamped> &plan) {
   plan.clear();
   nav_msgs::Path path;
@@ -322,24 +321,19 @@ void DownTheCLiFFPlanner::publishPath(
   path_pub.publish(path);
 }
 
-std::vector<double>
-DownTheCLiFFPlanner::getSpeeds(typeparams::state *state_initial_in,
-                               trajectory_t *trajectory_in) {
+std::vector<double> DownTheCLiFFPlanner::getSpeeds(State *state_initial_in,
+                                                   Trajectory *trajectory_in) {
   std::vector<double> speeds;
 
-  typedef typeparams::state state_t;
-  typedef typeparams::input input_t;
+  State *state_prev = state_initial_in;
 
-  state_t *state_prev = state_initial_in;
+  std::list<State *>::iterator iter_state = trajectory_in->list_states.begin();
 
-  std::list<state_t *>::iterator iter_state =
-      trajectory_in->list_states.begin();
-
-  for (std::list<input_t *>::iterator iter_input =
+  for (std::list<Input *>::iterator iter_input =
            trajectory_in->list_inputs.begin();
        iter_input != trajectory_in->list_inputs.end(); iter_input++) {
-    input_t *input_curr = *iter_input;
-    state_t *state_curr = *iter_state;
+    Input *input_curr = *iter_input;
+    State *state_curr = *iter_state;
 
     // 1. Compute distance between the previous and current state.
     double this_distance_sq =
@@ -358,29 +352,26 @@ DownTheCLiFFPlanner::getSpeeds(typeparams::state *state_initial_in,
   return speeds;
 }
 
-double DownTheCLiFFPlanner::cost_function_cliff(
-    typeparams::state *state_initial_in, trajectory_t *trajectory_in,
-    typeparams::state *state_final_in, bool only_distance_cost,
-    bool upstream_cost) {
+double DownTheCLiFFPlanner::cost_function_cliff(State *state_initial_in,
+                                                Trajectory *trajectory_in,
+                                                State *state_final_in,
+                                                bool only_distance_cost,
+                                                bool upstream_cost) {
 
   if (upstream_cost)
     return cost_function_upstream(state_initial_in, trajectory_in,
                                   state_final_in);
 
-  typedef typeparams::state state_t;
-  typedef typeparams::input input_t;
-
-  state_t *state_prev = state_initial_in;
+  State *state_prev = state_initial_in;
   double total_cost = 0.0;
 
-  std::list<state_t *>::iterator iter_state =
-      trajectory_in->list_states.begin();
+  std::list<State *>::iterator iter_state = trajectory_in->list_states.begin();
 
-  for (std::list<input_t *>::iterator iter_input =
+  for (std::list<Input *>::iterator iter_input =
            trajectory_in->list_inputs.begin();
        iter_input != trajectory_in->list_inputs.end(); iter_input++) {
-    input_t *input_curr = *iter_input;
-    state_t *state_curr = *iter_state;
+    Input *input_curr = *iter_input;
+    State *state_curr = *iter_state;
 
     // 1. Compute distance between the previous and current state.
     double this_distance_sq =
@@ -396,7 +387,7 @@ double DownTheCLiFFPlanner::cost_function_cliff(
     double q_dist = pow(1.0 - fabs(dot), 2);
 
     // Total distance for now.
-    double distance_cost = sqrt(this_distance_sq) + 10.0*sqrt(q_dist);
+    double distance_cost = sqrt(this_distance_sq) + 10.0 * sqrt(q_dist);
 
     double this_time = (*input_curr)[0];
 
@@ -457,25 +448,20 @@ double DownTheCLiFFPlanner::cost_function_cliff(
   return total_cost;
 }
 
-double
-DownTheCLiFFPlanner::cost_function_upstream(typeparams::state *state_initial_in,
-                                            trajectory_t *trajectory_in,
-                                            typeparams::state *state_final_in) {
+double DownTheCLiFFPlanner::cost_function_upstream(State *state_initial_in,
+                                                   Trajectory *trajectory_in,
+                                                   State *state_final_in) {
 
-  typedef typeparams::state state_t;
-  typedef typeparams::input input_t;
-
-  state_t *state_prev = state_initial_in;
+  State *state_prev = state_initial_in;
   double total_cost = 0.0;
 
-  std::list<state_t *>::iterator iter_state =
-      trajectory_in->list_states.begin();
+  std::list<State *>::iterator iter_state = trajectory_in->list_states.begin();
 
-  for (std::list<input_t *>::iterator iter_input =
+  for (std::list<Input *>::iterator iter_input =
            trajectory_in->list_inputs.begin();
        iter_input != trajectory_in->list_inputs.end(); iter_input++) {
-    input_t *input_curr = *iter_input;
-    state_t *state_curr = *iter_state;
+    Input *input_curr = *iter_input;
+    State *state_curr = *iter_state;
 
     // 1. Compute distance between the previous and current state.
     double this_distance_sq =
@@ -528,7 +514,7 @@ DownTheCLiFFPlanner::cost_function_upstream(typeparams::state *state_initial_in,
   }
   return total_cost;
 }
-}
+} // namespace cliff_planners
 
 PLUGINLIB_EXPORT_CLASS(cliff_planners::DownTheCLiFFPlanner,
                        nav_core::BaseGlobalPlanner)

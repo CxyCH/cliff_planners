@@ -6,18 +6,17 @@
 #include <cliffmap_ros/cliffmap.hpp>
 
 // This package headers
-#include <smp/components/samplers/cliff.hpp>
+#include <smp/samplers/cliff.hpp>
 
 // SMP HEADER FILES ------
-#include <smp/components/collision_checkers/multiple_circles_mrpt.hpp>
-#include <smp/components/distance_evaluators/kdtree.hpp>
-#include <smp/components/extenders/dubins.hpp>
-#include <smp/components/extenders/single_integrator.hpp>
-#include <smp/components/multipurpose/minimum_time_reachability.hpp>
+#include <smp/collision_checkers/multiple_circles_mrpt.hpp>
+#include <smp/distance_evaluators/kdtree.hpp>
+#include <smp/extenders/dubins.hpp>
+#include <smp/multipurpose/minimum_time_reachability.hpp>
 #include <smp/planners/rrtstar.hpp>
 
-#include <smp/planner_utils/trajectory.hpp>
-#include <smp/planner_utils/vertex_edge.hpp>
+#include <smp/trajectory.hpp>
+#include <smp/vertex_edge.hpp>
 
 // ROS headers
 #include <costmap_2d/costmap_2d.h>
@@ -33,32 +32,11 @@
 #include <visualization_msgs/MarkerArray.h>
 
 // SMP TYPE DEFINITIONS -------
-// State, input, vertex_data, and edge_data definitions
-typedef smp::state_dubins StateDubins;
-typedef smp::input_dubins InputDubins;
-typedef smp::minimum_time_reachability_vertex_data vertex_data_t;
-typedef smp::minimum_time_reachability_edge_data edge_data_t;
-
-// Create the typeparams structure
-typedef struct _typeparams {
-  typedef StateDubins state;
-  typedef InputDubins input;
-  typedef vertex_data_t vertex_data;
-  typedef edge_data_t edge_data;
-} typeparams;
-
-// Define the trajectory type
-typedef smp::trajectory<typeparams> trajectory_t;
-
-// Define all planner component types
-typedef smp::sampler_cliff<typeparams, 3> CLiFFMapSampler;
-typedef smp::distance_evaluator_kdtree<typeparams, 3> KDTreeDistanceEvaluator;
-typedef smp::extender_dubins<typeparams> ExtenderDubins;
-typedef smp::collision_checker_mc_mrpt<typeparams> CollisionCheckerMCMRPT;
-typedef smp::minimum_time_reachability<typeparams, 3> MinimumTimeReachability;
-
-// Define all algorithm types
-typedef smp::rrtstar<typeparams> RRTStar;
+using State = smp::StateDubins;
+using Input = smp::InputDubins;
+using VertexData = smp::MTRVertexData;
+using EdgeData = smp::MTREdgeData;
+using Trajectory = smp::Trajectory<State, Input>;
 
 namespace cliff_planners {
 
@@ -68,9 +46,10 @@ private:
   ros::NodeHandle nh;
   ros::NodeHandle private_nh;
 
-  CLiFFMapSampler sampler;
-  ExtenderDubins extender;
-  std::shared_ptr<CollisionCheckerMCMRPT> collision_checker;
+  smp::samplers::CLiFF<State, 3> sampler;
+  smp::extenders::Dubins extender;
+  std::shared_ptr<smp::collision_checkers::MultipleCirclesMRPT<State, Input>>
+      collision_checker;
 
   cliffmap_ros::CLiFFMapPtr cliffmap;
 
@@ -97,19 +76,19 @@ protected:
    * This function computes the Down-the-cliff cost.
    * This includes the cost of distance and the Mahalanobis cost.
    */
-  double cost_function_cliff(typeparams::state *state_initial_in,
-                             trajectory_t *trajectory_in,
-                             typeparams::state *state_final_in,
+  double cost_function_cliff(State *state_initial_in,
+                             Trajectory *trajectory_in,
+                             State *state_final_in,
                              bool only_distance_cost, bool upstream_cost);
 
-  double cost_function_upstream(typeparams::state *state_initial_in,
-                                trajectory_t *trajectory_in,
-                                typeparams::state *state_final_in);
+  double cost_function_upstream(State *state_initial_in,
+                                Trajectory *trajectory_in,
+                                State *state_final_in);
 
-  std::vector<double> getSpeeds(typeparams::state *state_initial_in,
-                                trajectory_t *trajectory_in);
+  std::vector<double> getSpeeds(State *state_initial_in,
+                                Trajectory *trajectory_in);
 
-  void publishPath(const trajectory_t &trajectory_final,
+  void publishPath(const Trajectory &trajectory_final,
                    std::vector<geometry_msgs::PoseStamped> &plan);
 
 public:
@@ -131,9 +110,9 @@ public:
 std::array<double, 3> distanceBetweenStates(const std::array<double, 3> &state,
                                             const std::array<double, 3> &goal);
 
-template <typename T>
+template <class State, class Input, class VertexData, class EdgeData>
 void graphToMsg(ros::NodeHandle &nh, geometry_msgs::PoseArray &graph,
-                smp::vertex<T> *root) {
+                smp::Vertex<State, Input, VertexData, EdgeData> *root) {
   geometry_msgs::Pose p;
   p.position.x = root->state->state_vars[0];
   p.position.y = root->state->state_vars[1];
@@ -146,9 +125,3 @@ void graphToMsg(ros::NodeHandle &nh, geometry_msgs::PoseArray &graph,
   }
 }
 
-template <typename T> void freeGraph(smp::vertex<T> *root) {
-  for (auto another_root : root->outgoing_edges) {
-    freeGraph(another_root->vertex_dst);
-  }
-  delete root;
-}
