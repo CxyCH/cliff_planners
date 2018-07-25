@@ -104,7 +104,7 @@ void DownTheCLiFFPlanner::initialize(std::string name,
   }
 
   collision_checker = std::make_shared<
-      smp::collision_checkers::MultipleCirclesMRPT<State, Input>>(map, 0.15,
+      smp::collision_checkers::MultipleCirclesMRPT<State>>(map, 0.15,
                                                                   footprint);
 
   sampler.set_support(cliffmap);
@@ -115,9 +115,7 @@ bool DownTheCLiFFPlanner::makePlan(
     const geometry_msgs::PoseStamped &goal,
     std::vector<geometry_msgs::PoseStamped> &plan) {
 
-  smp::distance_evaluators::KDTree<State, Input, VertexData, EdgeData, 3>
-      distance_evaluator;
-
+  smp::distance_evaluators::KDTree<State, Input, 3> distance_evaluator;
   smp::multipurpose::MinimumTimeReachability<State, Input, 3>
       min_time_reachability;
 
@@ -147,7 +145,7 @@ bool DownTheCLiFFPlanner::makePlan(
     std::cout << blue << "USING UPSTREAM COSTS AND DISTANCE COSTS.\n";
   }
 
-  smp::planners::RRTStar<State, Input, VertexData, EdgeData, 3> planner(
+  smp::planners::RRTStar<State, Input> planner(
       sampler, distance_evaluator, extender, *collision_checker,
       min_time_reachability, min_time_reachability);
 
@@ -190,7 +188,7 @@ bool DownTheCLiFFPlanner::makePlan(
   state_initial->state_vars[2] =
       2 * atan2(start.pose.orientation.z, start.pose.orientation.w);
 
-  if (collision_checker->check_collision_state(state_initial) == 0) {
+  if (collision_checker->check_collision(state_initial) == 0) {
     ROS_ERROR("Start state is in collision. Planning failed.");
     return false;
   } else
@@ -286,7 +284,7 @@ bool DownTheCLiFFPlanner::makePlan(
   if (plan.empty()) {
     ROS_ERROR("NO PLAN FOUND!");
   }
-  
+
   return true;
 }
 

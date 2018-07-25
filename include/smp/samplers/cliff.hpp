@@ -24,8 +24,8 @@ template <class State, int NUM_DIMENSIONS>
 class CLiFF : public Base<State> {
 
   Region<NUM_DIMENSIONS> support;
-  Region<NUM_DIMENSIONS> region_goal;
-  double bias{0.05};
+  Region<NUM_DIMENSIONS> goal_region;
+  double goal_bias{0.0};
 
   cliffmap_ros::CLiFFMapConstPtr cliffmap;
 
@@ -49,7 +49,7 @@ public:
 
   inline void dontUseCLiFFSampling() { no_cliff_sampling = true; }
 
-  int set_goal_bias(double bias, const Region<NUM_DIMENSIONS> &region_goal);
+  int set_goal_bias(double bias, const Region<NUM_DIMENSIONS> &goal_region);
 
   inline void reset_rejections() { rejections = 0; }
 

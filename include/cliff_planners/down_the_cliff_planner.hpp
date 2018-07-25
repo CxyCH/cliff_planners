@@ -34,8 +34,6 @@
 // SMP TYPE DEFINITIONS -------
 using State = smp::StateDubins;
 using Input = smp::InputDubins;
-using VertexData = smp::MTRVertexData;
-using EdgeData = smp::MTREdgeData;
 using Trajectory = smp::Trajectory<State, Input>;
 
 namespace cliff_planners {
@@ -48,7 +46,7 @@ private:
 
   smp::samplers::CLiFF<State, 3> sampler;
   smp::extenders::Dubins extender;
-  std::shared_ptr<smp::collision_checkers::MultipleCirclesMRPT<State, Input>>
+  std::shared_ptr<smp::collision_checkers::MultipleCirclesMRPT<State>>
       collision_checker;
 
   cliffmap_ros::CLiFFMapPtr cliffmap;
@@ -76,10 +74,9 @@ protected:
    * This function computes the Down-the-cliff cost.
    * This includes the cost of distance and the Mahalanobis cost.
    */
-  double cost_function_cliff(State *state_initial_in,
-                             Trajectory *trajectory_in,
-                             State *state_final_in,
-                             bool only_distance_cost, bool upstream_cost);
+  double cost_function_cliff(State *state_initial_in, Trajectory *trajectory_in,
+                             State *state_final_in, bool only_distance_cost,
+                             bool upstream_cost);
 
   double cost_function_upstream(State *state_initial_in,
                                 Trajectory *trajectory_in,
@@ -110,9 +107,9 @@ public:
 std::array<double, 3> distanceBetweenStates(const std::array<double, 3> &state,
                                             const std::array<double, 3> &goal);
 
-template <class State, class Input, class VertexData, class EdgeData>
+template <class State, class Input>
 void graphToMsg(ros::NodeHandle &nh, geometry_msgs::PoseArray &graph,
-                smp::Vertex<State, Input, VertexData, EdgeData> *root) {
+                smp::Vertex<State, Input> *root) {
   geometry_msgs::Pose p;
   p.position.x = root->state->state_vars[0];
   p.position.y = root->state->state_vars[1];
@@ -124,4 +121,3 @@ void graphToMsg(ros::NodeHandle &nh, geometry_msgs::PoseArray &graph,
     graphToMsg(nh, graph, another_root->vertex_dst);
   }
 }
-

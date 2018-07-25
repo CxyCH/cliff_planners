@@ -78,10 +78,10 @@ int smp::samplers::CLiFF<State, NUM_DIMENSIONS>::sampleV2(
   for (int i = 0;; i++) {
 
     // With a small probability pick the goal itself.
-    if (bias > randnum1) {
+    if (goal_bias > randnum1) {
       for (int i = 0; i < NUM_DIMENSIONS; i++)
-        (*state_new)[i] = region_goal.size[i] * rand() / (RAND_MAX + 1.0) -
-                          region_goal.size[i] / 2.0 + region_goal.center[i];
+        (*state_new)[i] = goal_region.size[i] * rand() / (RAND_MAX + 1.0) -
+                          goal_region.size[i] / 2.0 + goal_region.center[i];
       *state_sample_out = state_new;
       return 1;
     }
@@ -154,10 +154,10 @@ int smp::samplers::CLiFF<State, NUM_DIMENSIONS>::sampleV2(
 //   for (int i = 0;; i++) {
 
 //     // With a small probability pick the goal itself.
-//     if (bias > randnum1) {
+//     if (goal_bias > randnum1) {
 //       for (int i = 0; i < NUM_DIMENSIONS; i++)
-//         (*state_new)[i] = region_goal.size[i] * rand() / (RAND_MAX + 1.0) -
-//                           region_goal.size[i] / 2.0 + region_goal.center[i];
+//         (*state_new)[i] = goal_region.size[i] * rand() / (RAND_MAX + 1.0) -
+//                           goal_region.size[i] / 2.0 + goal_region.center[i];
 //       *state_sample_out = state_new;
 //       return 1;
 //     }
@@ -218,9 +218,9 @@ int smp::samplers::CLiFF<State, NUM_DIMENSIONS>::set_support(
 
 template <class State, int NUM_DIMENSIONS>
 int smp::samplers::CLiFF<State, NUM_DIMENSIONS>::set_goal_bias(
-    double bias, const Region<NUM_DIMENSIONS> &region_goal) {
-  this->bias = bias;
-  this->region_goal = region_goal;
+    double bias, const Region<NUM_DIMENSIONS> &goal_region) {
+  this->goal_bias = bias;
+  this->goal_region = goal_region;
   time_t t;
   srand((unsigned)time(&t));
   return 1;
