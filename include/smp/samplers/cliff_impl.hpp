@@ -2,7 +2,8 @@
 
 template <class State, int NUM_DIMENSIONS>
 smp::samplers::CLiFF<State, NUM_DIMENSIONS>::CLiFF(
-    const cliffmap_ros::CLiFFMapConstPtr &map) {
+    const cliffmap_ros::CLiFFMapConstPtr &map)
+    : gen(rd()), uniform_distribution(0.0, 1.0) {
   this->set_support(map);
   rejections = 0;
 }
@@ -71,9 +72,9 @@ int smp::samplers::CLiFF<State, NUM_DIMENSIONS>::sampleV2(
 
   State *state_new = new State;
 
-  double randnum1 = double(rand()) / double(RAND_MAX);
-  double randnum2 = double(rand()) / double(RAND_MAX);
-  double randnum3 = double(rand()) / double(RAND_MAX);
+  double randnum1 = uniform_distribution(gen);
+  double randnum2 = uniform_distribution(gen);
+  double randnum3 = uniform_distribution(gen);
 
   for (int i = 0;; i++) {
 
@@ -96,12 +97,12 @@ int smp::samplers::CLiFF<State, NUM_DIMENSIONS>::sampleV2(
       break;
 
     // With a small probability accept the sample without changes.
-    if(0.80 < randnum1) {
+    if (0.80 < randnum1) {
       *state_sample_out = state_new;
       return 1;
     }
 
-    // obvious else again. 
+    // obvious else again.
     double x = state_new->state_vars[0];
     double y = state_new->state_vars[1];
     double prob1 = (*cliffmap)(x, y).q;

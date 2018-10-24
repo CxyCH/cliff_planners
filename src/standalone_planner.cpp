@@ -22,8 +22,6 @@ protected:
 
   tf::TransformListener tf;
   costmap_2d::Costmap2DROS costmap;
-  ros::ServiceClient make_plan_client;
-  ros::ServiceServer make_plan_server;
 
   cliff_planners::DownTheCLiFFPlanner dtcp;
 
@@ -51,32 +49,17 @@ public:
 };
 
 bool StandAlonePlanner::makePlan(nav_msgs::GetPlan &msg) {
-  if (!make_plan_client.call(msg)) {
-    ROS_FATAL("Couldn't call make plan. Is move_base running?");
-    sleep(1);
-    return false;
-  }
-  sleep(1);
-  return true;
-}
-
-bool StandAlonePlanner::makePlanCallback(nav_msgs::GetPlan::Request &req,
-                                         nav_msgs::GetPlan::Response &res) {
-  dtcp.makePlan_1(req.start, req.goal, res.plan.poses);
-  res.plan.header.frame_id = "map";
-  res.plan.header.stamp = ros::Time::now();
+  dtcp.makePlan_1(msg.request.start, msg.request.goal, msg.response.plan.poses);
+  msg.response.plan.header.frame_id = "map" ;
+  msg.response.plan.header.stamp = ros::Time::now();
   return true;
 }
 
 StandAlonePlanner::StandAlonePlanner()
     : tf(ros::Duration(10)), costmap("my_costmap", tf) {
-  make_plan_server = nh.advertiseService(
-      "make_plan", &StandAlonePlanner::makePlanCallback, this);
 
   costmap.start();
-  make_plan_client = nh.serviceClient<nav_msgs::GetPlan>("make_plan");
-  make_plan_client.waitForExistence();
-  ROS_INFO("Connect to move base. Make plans by setting two navigation goals\n"
+  ROS_INFO("Make plans by setting two navigation goals\n"
            "in rviz. The first one will be interpretted as the start pose.\n"
            "The second will be interpretted as the goal.\n");
 

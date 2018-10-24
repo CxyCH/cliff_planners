@@ -20,8 +20,7 @@ namespace samplers {
 
   \ingroup samplers
 */
-template <class State, int NUM_DIMENSIONS>
-class CLiFF : public Base<State> {
+template <class State, int NUM_DIMENSIONS> class CLiFF : public Base<State> {
 
   Region<NUM_DIMENSIONS> support;
   Region<NUM_DIMENSIONS> goal_region;
@@ -35,6 +34,10 @@ class CLiFF : public Base<State> {
    * When this parameter is set, only a goal-biased uniform sampling is done.
    */
   bool no_cliff_sampling{false};
+
+  std::random_device rd;
+  std::mt19937 gen;
+  std::uniform_real_distribution<> uniform_distribution;
 
 public:
   CLiFF();
