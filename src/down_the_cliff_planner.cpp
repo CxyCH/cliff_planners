@@ -65,11 +65,6 @@ void DownTheCLiFFPlanner::initialize(std::string name,
   ROS_INFO("Read a cliffmap XML organized as a grid @ %lf m/cell resolution.",
            cliffmap->getResolution());
 
-  marker_pub =
-      nh.advertise<visualization_msgs::MarkerArray>("visualization_markers", 1);
-  ma = cliffmap->toVisualizationMarkers();
-  marker_pub.publish(ma);
-
   // TODO: All parameters must be configurable.
   graph_pub = nh.advertise<geometry_msgs::PoseArray>("/graph", 100);
 
@@ -118,8 +113,6 @@ bool DownTheCLiFFPlanner::makePlan(
   smp::distance_evaluators::KDTree<State, Input, 3> distance_evaluator;
   smp::multipurpose::MinimumTimeReachability<State, Input, 3>
       min_time_reachability;
-
-  marker_pub.publish(ma);
 
   // extender.set_turning_radius(0.5);
 
@@ -379,8 +372,8 @@ double DownTheCLiFFPlanner::cost_function_cliff(State *state_initial_in,
     // 2. Compute the quaternion distance.
     double dot = cos(state_curr->state_vars[2] / 2.0) *
                      cos(state_prev->state_vars[2] / 2.0) +
-                 sin(state_curr->state_vars[2] / 2.0 *
-                     sin(state_prev->state_vars[2] / 2.0));
+                 sin(state_curr->state_vars[2] / 2.0) *
+                     sin(state_prev->state_vars[2] / 2.0);
 
     double q_dist = pow(1.0 - fabs(dot), 2);
 
