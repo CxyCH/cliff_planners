@@ -5,6 +5,7 @@
   Rejection sampling.
 */
 
+#include <random>
 #include <memory>
 #include <smp/region.hpp>
 #include <smp/samplers/base.hpp>
