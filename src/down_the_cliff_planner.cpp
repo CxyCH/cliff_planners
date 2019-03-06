@@ -462,8 +462,8 @@ double DownTheCLiFFPlanner::cost_function_upstream(State *state_initial_in,
     // 2. Compute the quaternion distance.
     double dot = cos(state_curr->state_vars[2] / 2.0) *
                      cos(state_prev->state_vars[2] / 2.0) +
-                 sin(state_curr->state_vars[2] / 2.0 *
-                     sin(state_prev->state_vars[2] / 2.0));
+                 sin(state_curr->state_vars[2] / 2.0) *
+                     sin(state_prev->state_vars[2] / 2.0);
 
     double q_dist = pow(1.0 - fabs(dot), 2);
 

@@ -9,7 +9,7 @@
   <node name="static_tf0" pkg="tf" type="static_transform_publisher" args="2 0 0 0 0 0 /map /base_link 100"/>
 
   <!-- Node 2: Map server -->
-  <node name="map_server" type="map_server" pkg="map_server" args="$(find smp_ros)/maps/intersect.yaml"/>
+  <node name="map_server" type="map_server" pkg="map_server" args="$(find smp_ros)/maps/1world.yaml"/>
 
   <!-- Node 3: Costmap -->
   <!--node name="costmap_node" type="costmap_2d_node" pkg="costmap_2d">
