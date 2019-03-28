@@ -58,9 +58,7 @@ void DownTheCLiFFPlanner::initialize(std::string name,
     exit(1);
   }
 
-  cliffmap = std::make_shared<cliffmap_ros::CLiFFMap>();
-  cliffmap->readFromXML(cliffmapFileName);
-  cliffmap->organizeAsGrid();
+  cliffmap = std::make_shared<cliffmap_ros::CLiFFMap>(cliffmapFileName, true);
 
   ROS_INFO("Read a cliffmap XML organized as a grid @ %lf m/cell resolution.",
            cliffmap->getResolution());
